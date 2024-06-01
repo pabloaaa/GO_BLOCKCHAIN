@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package main;
+
+option go_package = "Blockchain/protos/block_chain"; 
+
+service BlockchainService {
+  rpc AddBlock (BlockRequest) returns (BlockResponse) {}
+  rpc GetBlockchain (Empty) returns (BlockchainResponse) {}
+}
+
+message BlockRequest {
+  Block block = 1;
+}
+
+message BlockResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message Empty {}
+
+message BlockchainResponse {
+  repeated Block blocks = 1;
+}
+
+message Block {
+  uint64 index = 1;
+  uint64 timestamp = 2;
+  repeated Transaction transactions = 3;
+  string previousHash = 4;
+  string hash = 5;
+  uint64 data = 6;
+}
+
+message Transaction {
+  string sender = 1;
+  string receiver = 2;
+  double amount = 3;
+}
