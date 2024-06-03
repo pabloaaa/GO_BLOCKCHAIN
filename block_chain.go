@@ -47,3 +47,9 @@ func (bc *Blockchain) len() int {
 	defer bc.mux.Unlock()
 	return len(bc.chain)
 }
+
+func (bc *Blockchain) GetBlocks() []Block {
+	bc.mux.Lock()
+	defer bc.mux.Unlock()
+	return bc.chain
+}

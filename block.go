@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"strconv"
 	"strings"
+
+	pb "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 )
 
 type Transaction struct {
@@ -43,4 +45,44 @@ func (b *Block) calculateHash() {
 	data := strconv.FormatUint((b.Index), 10) + strconv.FormatUint(b.Timestamp, 10) + strings.Join(transactionsStrings, "") + b.PreviousHash + strconv.FormatUint(b.Data, 10)
 	hash := sha256.Sum256([]byte(data))
 	b.Hash = hex.EncodeToString(hash[:])
+}
+
+func BlockFromProto(pbBlock *pb.Block) *Block {
+	transactions := make([]Transaction, len(pbBlock.GetTransactions()))
+	for i, pbTransaction := range pbBlock.GetTransactions() {
+		transactions[i] = Transaction{
+			Sender:   pbTransaction.GetSender(),
+			Receiver: pbTransaction.GetReceiver(),
+			Amount:   pbTransaction.GetAmount(),
+		}
+	}
+
+	return &Block{
+		Index:        pbBlock.GetIndex(),
+		Timestamp:    pbBlock.GetTimestamp(),
+		PreviousHash: pbBlock.GetPreviousHash(),
+		Hash:         pbBlock.GetHash(),
+		Transactions: transactions,
+		Data:         pbBlock.GetData(),
+	}
+}
+
+func (b *Block) ToProto() *pb.Block {
+	pbTransactions := make([]*pb.Transaction, len(b.Transactions))
+	for i, transaction := range b.Transactions {
+		pbTransactions[i] = &pb.Transaction{
+			Sender:   transaction.Sender,
+			Receiver: transaction.Receiver,
+			Amount:   transaction.Amount,
+		}
+	}
+
+	return &pb.Block{
+		Index:        b.Index,
+		Timestamp:    b.Timestamp,
+		PreviousHash: b.PreviousHash,
+		Hash:         b.Hash,
+		Transactions: pbTransactions,
+		Data:         b.Data,
+	}
 }

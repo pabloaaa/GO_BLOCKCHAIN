@@ -11,7 +11,7 @@ func NewBlockValidator() *BlockValidator {
 	return &BlockValidator{}
 }
 
-func (bv *BlockValidator) ValidateAndAddBlock(block Block, blockchain *Blockchain) error {
+func (bv *BlockValidator) ValidateAndAddBlock(block *Block, blockchain *Blockchain) error {
 	blockchain.mux.Lock()
 	lastBlock := blockchain.Last()
 	blockchain.mux.Unlock()
@@ -29,7 +29,7 @@ func (bv *BlockValidator) ValidateAndAddBlock(block Block, blockchain *Blockchai
 	}
 
 	blockchain.mux.Lock()
-	blockchain.AddBlock(block)
+	blockchain.AddBlock(*block) // Dereference block here
 	blockchain.mux.Unlock()
 
 	return nil

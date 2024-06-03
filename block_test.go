@@ -2,9 +2,11 @@ package main
 
 import (
 	"testing"
+
+	pb "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 )
 
-func TestNewBlock(t *testing.T) {
+func setup() *Block {
 	transactions := []Transaction{
 		{
 			Sender:   "Alice",
@@ -12,62 +14,108 @@ func TestNewBlock(t *testing.T) {
 			Amount:   10.0,
 		},
 	}
+	return NewBlock(1, 123456789, transactions, "previousHash", 0)
+}
 
-	tests := []struct {
-		name           string
-		index          uint64
-		timestamp      uint64
-		transactions   []Transaction
-		previousHash   string
-		nonce          uint64
-		expectedIndex  uint64
-		expectedHash   string
-		expectedPrevH  string
-		expectedNonce  uint64
-		expectedLength int
-	}{
-		{
-			name:           "Test New Block",
-			index:          1,
-			timestamp:      123456789,
-			transactions:   transactions,
-			previousHash:   "previousHash",
-			nonce:          0,
-			expectedIndex:  1,
-			expectedPrevH:  "previousHash",
-			expectedNonce:  0,
-			expectedLength: 1,
-		},
-		// Add more test cases here
+func TestNewBlock(t *testing.T) {
+	block := setup()
+
+	if block.Index != 1 {
+		t.Errorf("Expected block index to be %d, but got %d", 1, block.Index)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			block := NewBlock(tt.index, tt.timestamp, tt.transactions, tt.previousHash, tt.nonce)
+	if block.Timestamp != 123456789 {
+		t.Errorf("Expected block timestamp to be %d, but got %d", 123456789, block.Timestamp)
+	}
 
-			if block.Index != tt.expectedIndex {
-				t.Errorf("Expected block index to be %d, but got %d", tt.expectedIndex, block.Index)
-			}
+	if block.PreviousHash != "previousHash" {
+		t.Errorf("Expected block previous hash to be '%s', but got %s", "previousHash", block.PreviousHash)
+	}
 
-			if block.Timestamp != tt.timestamp {
-				t.Errorf("Expected block timestamp to be %d, but got %d", tt.timestamp, block.Timestamp)
-			}
+	if len(block.Transactions) != 1 {
+		t.Errorf("Expected block to have %d transaction, but got %d", 1, len(block.Transactions))
+	}
 
-			if block.PreviousHash != tt.expectedPrevH {
-				t.Errorf("Expected block previous hash to be '%s', but got %s", tt.expectedPrevH, block.PreviousHash)
-			}
+	if block.Data != 0 {
+		t.Errorf("Expected block data to be %d, but got %d", 0, block.Data)
+	}
 
-			if len(block.Transactions) != tt.expectedLength {
-				t.Errorf("Expected block to have %d transaction, but got %d", tt.expectedLength, len(block.Transactions))
-			}
+	if block.Hash == "" {
+		t.Errorf("Expected block hash to be calculated, but got an empty string")
+	}
+}
 
-			if block.Data != tt.expectedNonce {
-				t.Errorf("Expected block data to be %d, but got %d", tt.expectedNonce, block.Data)
-			}
+func TestCalculateHash(t *testing.T) {
+	block := setup()
+	originalHash := block.Hash
 
-			if block.Hash == "" {
-				t.Errorf("Expected block hash to be calculated, but got an empty string")
-			}
-		})
+	// Change the state of the block
+	block.Data++
+
+	block.calculateHash()
+
+	if block.Hash == "" || block.Hash == originalHash {
+		t.Errorf("Expected block hash to be calculated, but got %s", block.Hash)
+	}
+}
+
+func TestBlockFromProto(t *testing.T) {
+	pbBlock := &pb.Block{
+		Index:        1,
+		Timestamp:    123456789,
+		PreviousHash: "previousHash",
+		Hash:         "hash",
+		Transactions: []*pb.Transaction{
+			{
+				Sender:   "Alice",
+				Receiver: "Bob",
+				Amount:   10.0,
+			},
+		},
+		Data: 0,
+	}
+	block := BlockFromProto(pbBlock)
+
+	if block.Index != pbBlock.GetIndex() {
+		t.Errorf("Expected %d, got %d", pbBlock.GetIndex(), block.Index)
+	}
+	if block.Timestamp != pbBlock.GetTimestamp() {
+		t.Errorf("Expected %d, got %d", pbBlock.GetTimestamp(), block.Timestamp)
+	}
+	if block.PreviousHash != pbBlock.GetPreviousHash() {
+		t.Errorf("Expected %s, got %s", pbBlock.GetPreviousHash(), block.PreviousHash)
+	}
+	if block.Hash != pbBlock.GetHash() {
+		t.Errorf("Expected %s, got %s", pbBlock.GetHash(), block.Hash)
+	}
+	if len(block.Transactions) != len(pbBlock.GetTransactions()) {
+		t.Errorf("Expected %d, got %d", len(pbBlock.GetTransactions()), len(block.Transactions))
+	}
+	if block.Data != pbBlock.GetData() {
+		t.Errorf("Expected %d, got %d", pbBlock.GetData(), block.Data)
+	}
+}
+
+func TestToProto(t *testing.T) {
+	block := setup()
+	pbBlock := block.ToProto()
+
+	if pbBlock.GetIndex() != block.Index {
+		t.Errorf("Expected %d, got %d", block.Index, pbBlock.GetIndex())
+	}
+	if pbBlock.GetTimestamp() != block.Timestamp {
+		t.Errorf("Expected %d, got %d", block.Timestamp, pbBlock.GetTimestamp())
+	}
+	if pbBlock.GetPreviousHash() != block.PreviousHash {
+		t.Errorf("Expected %s, got %s", block.PreviousHash, pbBlock.GetPreviousHash())
+	}
+	if pbBlock.GetHash() != block.Hash {
+		t.Errorf("Expected %s, got %s", block.Hash, pbBlock.GetHash())
+	}
+	if len(pbBlock.GetTransactions()) != len(block.Transactions) {
+		t.Errorf("Expected %d, got %d", len(block.Transactions), len(pbBlock.GetTransactions()))
+	}
+	if pbBlock.GetData() != block.Data {
+		t.Errorf("Expected %d, got %d", block.Data, pbBlock.GetData())
 	}
 }

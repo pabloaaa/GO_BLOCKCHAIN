@@ -27,7 +27,7 @@ func (bc *BlockCreator) Start(blockchain *Blockchain) {
 		block := NewBlock(index, timestamp, transactions, previousHash, uint64(nonce))
 		for {
 			blockchain.mux.Lock()
-			err := bc.validator.ValidateAndAddBlock(*block, blockchain)
+			err := bc.validator.ValidateAndAddBlock(block, blockchain)
 			blockchain.mux.Unlock()
 			if err == nil {
 				break

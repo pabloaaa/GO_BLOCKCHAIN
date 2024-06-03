@@ -1,51 +1,74 @@
 package main
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
+
+	pb "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
 )
+
+const bufSize = 1024 * 1024
+
+var lis *bufconn.Listener
+
+func init() {
+	lis = bufconn.Listen(bufSize)
+}
+
+func bufDialer(context.Context, string) (net.Conn, error) {
+	return lis.Dial()
+}
 
 func TestNewNode(t *testing.T) {
 	bc := NewBlockchain()
-	newBlockReceiver := make(chan Block)
+	validator := NewBlockValidator()
+	creator := NewBlockCreator(validator)
 
-	node := NewNode(bc, newBlockReceiver)
+	node := NewNode(bc, validator, creator)
 
 	if node.blockchain != bc {
 		t.Errorf("Expected node blockchain to be same as bc, but got different value")
 	}
 
-	if len(node.clients) != 0 {
-		t.Errorf("Expected node clients length to be 0, but got %d", len(node.clients))
+	if node.validator != validator {
+		t.Errorf("Expected node validator to be same as validator, but got different value")
 	}
 
-	if node.newBlockReceiver != newBlockReceiver {
-		t.Errorf("Expected node newBlockReceiver to be same as newBlockReceiver, but got different value")
+	if node.creator != creator {
+		t.Errorf("Expected node creator to be same as creator, but got different value")
 	}
 }
 
 func TestGetBlockchain(t *testing.T) {
 	bc := NewBlockchain()
-	newBlockReceiver := make(chan Block)
+	validator := NewBlockValidator()
+	creator := NewBlockCreator(validator)
 
-	node := NewNode(bc, newBlockReceiver)
+	node := NewNode(bc, validator, creator)
 
-	if node.GetBlockchain() != bc {
+	resp, err := node.GetBlockchain(context.Background(), &pb.Empty{})
+	if err != nil {
+		t.Errorf("Expected GetBlockchain to not return error, but got %v", err)
+	}
+
+	if len(resp.Blocks) != len(bc.GetBlocks()) {
 		t.Errorf("Expected GetBlockchain to return initial blockchain, but got different value")
 	}
 }
 
-// This is a mock test for Start method. In real scenario, you should use interface and mock the dependencies.
 func TestStart(t *testing.T) {
 	bc := NewBlockchain()
-	newBlockReceiver := make(chan Block)
+	validator := NewBlockValidator()
+	creator := NewBlockCreator(validator)
 
-	node := NewNode(bc, newBlockReceiver)
+	node := NewNode(bc, validator, creator)
 
 	go func() {
-		err := node.Start("localhost:8000")
-		if err != nil {
+		if err := node.Start("bufnet"); err != nil {
 			t.Errorf("Expected Start to not return error, but got %v", err)
 		}
 	}()
@@ -54,16 +77,28 @@ func TestStart(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// Connect to the server
-	conn, err := net.Dial("tcp", "localhost:8000")
+	conn, err := grpc.DialContext(context.Background(), "bufnet", grpc.WithContextDialer(bufDialer), grpc.WithInsecure())
 	if err != nil {
 		t.Errorf("Expected to connect to node, but got error: %v", err)
 	}
 	defer conn.Close()
 
-	// Wait for the connection to be added
-	time.Sleep(time.Second)
+	client := pb.NewBlockchainServiceClient(conn)
 
-	if len(node.clients) != 1 {
-		t.Errorf("Expected node clients length to be 1, but got %d", len(node.clients))
+	// Add a block
+	block := NewBlock(1, uint64(time.Now().Unix()), make([]Transaction, 0), "0", 0)
+	_, err = client.AddBlock(context.Background(), &pb.BlockRequest{Block: block.ToProto()})
+	if err != nil {
+		t.Errorf("Expected to add block, but got error: %v", err)
+	}
+
+	// Get the blockchain
+	resp, err := client.GetBlockchain(context.Background(), &pb.Empty{})
+	if err != nil {
+		t.Errorf("Expected to get blockchain, but got error: %v", err)
+	}
+
+	if len(resp.Blocks) != 2 {
+		t.Errorf("Expected blockchain length to be 2, but got %d", len(resp.Blocks))
 	}
 }
