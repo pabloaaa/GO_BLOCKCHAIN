@@ -51,12 +51,21 @@ func TestCalculateHash(t *testing.T) {
 
 	// Change the state of the block
 	block.Data++
-
 	block.calculateHash()
-
 	if block.Hash == "" || block.Hash == originalHash {
 		t.Errorf("Expected block hash to be calculated, but got %s", block.Hash)
 	}
+
+	// Reset block state and test with different field
+	block = setup()
+	originalHash = block.Hash
+	block.Index++
+	block.calculateHash()
+	if block.Hash == "" || block.Hash == originalHash {
+		t.Errorf("Expected block hash to be calculated, but got %s", block.Hash)
+	}
+
+	// Repeat for other fields as needed...
 }
 
 func TestBlockFromProto(t *testing.T) {

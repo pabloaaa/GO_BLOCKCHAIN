@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	pb "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 
@@ -10,6 +11,8 @@ import (
 
 type Client struct {
 	nodeClient pb.BlockchainServiceClient
+	blockchain *Blockchain
+	creator    *BlockCreator
 }
 
 func NewClient(address string) (*Client, error) {
@@ -18,31 +21,34 @@ func NewClient(address string) (*Client, error) {
 		return nil, err
 	}
 
-	client := pb.NewBlockchainServiceClient(conn)
+	blockchain := NewBlockchain()
+	validator := NewBlockValidator()
+	creator := NewBlockCreator(validator)
 
-	return &Client{nodeClient: client}, nil
+	return &Client{
+		nodeClient: pb.NewBlockchainServiceClient(conn),
+		blockchain: blockchain,
+		creator:    creator,
+	}, nil
+}
+
+func (c *Client) Start() {
+	c.creator.Start(c.blockchain)
 }
 
 func (c *Client) AddBlock(block *Block) error {
-	_, err := c.nodeClient.AddBlock(context.Background(), &pb.BlockRequest{Block: block.ToProto()})
+	// Notify the node about the new block
+	blockRequest := &pb.BlockRequest{
+		Block: block.ToProto(),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := c.nodeClient.AddBlock(ctx, blockRequest)
 	return err
 }
 
-func (c *Client) SubscribeNewBlocks() error {
-	stream, err := c.nodeClient.SubscribeNewBlocks(context.Background(), &pb.Empty{})
-	if err != nil {
-		return err
-	}
-
-	for {
-		block, err := stream.Recv()
-		if err != nil {
-			return err
-		}
-
-		// Handle the new block
-		_ = BlockFromProto(block)
-	}
-
-	return nil
+func (c *Client) GetBlockchain(ctx context.Context, empty *pb.Empty, opts ...grpc.CallOption) (*pb.BlockchainResponse, error) {
+	return c.nodeClient.GetBlockchain(ctx, empty, opts...)
 }

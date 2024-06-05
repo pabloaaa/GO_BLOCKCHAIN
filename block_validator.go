@@ -12,9 +12,8 @@ func NewBlockValidator() *BlockValidator {
 }
 
 func (bv *BlockValidator) ValidateAndAddBlock(block *Block, blockchain *Blockchain) error {
-	blockchain.mux.Lock()
+
 	lastBlock := blockchain.Last()
-	blockchain.mux.Unlock()
 
 	if block.Index != lastBlock.Index+1 {
 		return errors.New("Block index is not valid")
@@ -28,9 +27,7 @@ func (bv *BlockValidator) ValidateAndAddBlock(block *Block, blockchain *Blockcha
 		return errors.New("Block hash is not valid")
 	}
 
-	blockchain.mux.Lock()
 	blockchain.AddBlock(*block) // Dereference block here
-	blockchain.mux.Unlock()
 
 	return nil
 }

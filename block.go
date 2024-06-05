@@ -47,6 +47,11 @@ func (b *Block) calculateHash() {
 	b.Hash = hex.EncodeToString(hash[:])
 }
 
+func (b *Block) SetData(nonce uint64) {
+	b.Data = nonce
+	b.calculateHash()
+}
+
 func BlockFromProto(pbBlock *pb.Block) *Block {
 	transactions := make([]Transaction, len(pbBlock.GetTransactions()))
 	for i, pbTransaction := range pbBlock.GetTransactions() {

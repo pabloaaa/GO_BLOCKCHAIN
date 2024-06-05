@@ -17,6 +17,7 @@ message BlockRequest {
 message BlockResponse {
   bool success = 1;
   string message = 2;
+  Block block = 3;
 }
 
 message Empty {}
