@@ -1,106 +1,135 @@
 package main
 
 import (
-	"context"
+	"encoding/gob"
 	"log"
 	"net"
-	"sync"
 
 	pb "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
-
-	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 )
 
+type Message struct {
+	Type []byte
+	Data []byte
+}
+
 type Node struct {
-	pb.UnimplementedBlockchainServiceServer
-	blockchain  *Blockchain
-	subscribers []pb.BlockchainService_SubscribeNewBlocksServer
-	lock        sync.Mutex
+	blockchain *Blockchain
+	nodes      [][]byte
 }
 
 func NewNode(blockchain *Blockchain) *Node {
 	return &Node{
 		blockchain: blockchain,
+		nodes:      make([][]byte, 0),
 	}
 }
 
-func (n *Node) SubscribeNewBlocks(_ *pb.Empty, stream pb.BlockchainService_SubscribeNewBlocksServer) error {
-	n.subscribers = append(n.subscribers, stream)
-	return nil
-}
-
-func (n *Node) GetBlockchain(ctx context.Context, req *pb.Empty) (*pb.BlockchainResponse, error) {
-	blocks := n.blockchain.GetBlocks() // You need to implement this method in Blockchain
-
-	pbBlocks := make([]*pb.Block, len(blocks))
-	for i, block := range blocks {
-		pbBlocks[i] = block.ToProto()
-	}
-
-	return &pb.BlockchainResponse{Blocks: pbBlocks}, nil
-}
-
-func (n *Node) Start(address string) error {
-	listener, err := net.Listen("tcp", address)
+func (n *Node) Start(address []byte) {
+	ln, err := net.Listen("tcp", string(address))
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
+	defer ln.Close()
 
-	server := grpc.NewServer()
-	pb.RegisterBlockchainServiceServer(server, n) // You need to implement the required methods in Node
+	n.BroadcastAddress(address)
 
-	if err := server.Serve(listener); err != nil {
-		return err
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			log.Fatal(err)
+		}
+		go n.handleConnection(conn)
 	}
-
-	return nil
 }
 
-func (n *Node) AddBlock(ctx context.Context, req *pb.BlockRequest) (*pb.BlockResponse, error) {
-	n.lock.Lock()
-	defer n.lock.Unlock()
+func (n *Node) handleConnection(conn net.Conn) {
+	defer conn.Close()
 
-	// Get the last block again after acquiring the lock
-	lastBlock := n.blockchain.Last()
+	decoder := gob.NewDecoder(conn)
 
-	// Convert the protobuf block to your Block type
-	block := BlockFromProto(req.GetBlock())
-
-	// Update the index and previous hash of the new block based on the last block
-	block.Index = lastBlock.Index + 1
-	block.PreviousHash = lastBlock.Hash
-
-	// Validate the block before adding it to the blockchain
-	validator := NewBlockValidator()
-	if err := validator.ValidateAndAddBlock(block, n.blockchain); err != nil {
-		return &pb.BlockResponse{Success: false, Message: "Failed to add block"}, err
+	var message Message
+	err := decoder.Decode(&message)
+	if err != nil {
+		log.Println(err)
+		return
 	}
 
-	// Notify the subscribers about the new block
-	n.NotifySubscribers(block)
-
-	return &pb.BlockResponse{Success: true, Message: "Block added successfully", Block: block.ToProto()}, nil
+	// Handle the message based on its type
+	switch string(message.Type) {
+	case "Welcome":
+		// Handle Welcome message
+		welcomeRequest := &pb.WelcomeRequest{}
+		err := proto.Unmarshal(message.Data, welcomeRequest)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		n.nodes = append(n.nodes, welcomeRequest.Message)
+		n.SendAddress(conn.LocalAddr().String())
+	case "WelcomeResponse":
+		// Handle WelcomeResponse message
+		welcomeResponse := &pb.WelcomeResponse{}
+		err := proto.Unmarshal(message.Data, welcomeResponse)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		n.nodes = append(n.nodes, welcomeResponse.Message)
+	}
 }
 
-func (n *Node) NotifySubscribers(block *Block) {
-	for _, subscriber := range n.subscribers {
-		// Convert your block to protobuf format
-		pbBlock := block.ToProto()
+func (n *Node) BroadcastAddress(address []byte) {
+	for _, node := range n.nodes {
+		conn, err := net.Dial("tcp", string(node))
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer conn.Close()
 
-		// Create a new Block to send to the subscriber
-		newBlock := &pb.Block{
-			Index:        pbBlock.Index,
-			Timestamp:    pbBlock.Timestamp,
-			Transactions: pbBlock.Transactions,
-			PreviousHash: pbBlock.PreviousHash,
-			Hash:         pbBlock.Hash,
-			Data:         pbBlock.Data,
+		welcomeRequest := &pb.WelcomeRequest{
+			Message: address,
+		}
+		data, err := proto.Marshal(welcomeRequest)
+		if err != nil {
+			log.Fatal(err)
 		}
 
-		// Send the updated block to the subscriber
-		if err := subscriber.Send(newBlock); err != nil {
-			// Handle error
-			log.Printf("Failed to send updated block to subscriber: %v", err)
+		encoder := gob.NewEncoder(conn)
+		err = encoder.Encode(&Message{
+			Type: []byte("Welcome"),
+			Data: data,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func (n *Node) SendAddress(address string) {
+	for _, node := range n.nodes {
+		conn, err := net.Dial("tcp", string(node))
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer conn.Close()
+
+		welcomeResponse := &pb.WelcomeResponse{
+			Message: []byte(address),
+		}
+		data, err := proto.Marshal(welcomeResponse)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		encoder := gob.NewEncoder(conn)
+		err = encoder.Encode(&Message{
+			Type: []byte("WelcomeResponse"),
+			Data: data,
+		})
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 }

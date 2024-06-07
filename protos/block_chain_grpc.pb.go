@@ -22,6 +22,13 @@ const (
 	BlockchainService_AddBlock_FullMethodName           = "/main.BlockchainService/AddBlock"
 	BlockchainService_GetBlockchain_FullMethodName      = "/main.BlockchainService/GetBlockchain"
 	BlockchainService_SubscribeNewBlocks_FullMethodName = "/main.BlockchainService/SubscribeNewBlocks"
+	BlockchainService_GetNodes_FullMethodName           = "/main.BlockchainService/GetNodes"
+	BlockchainService_Welcome_FullMethodName            = "/main.BlockchainService/Welcome"
+	BlockchainService_GetBlocks_FullMethodName          = "/main.BlockchainService/GetBlocks"
+	BlockchainService_GetTransactionPool_FullMethodName = "/main.BlockchainService/GetTransactionPool"
+	BlockchainService_NewTransaction_FullMethodName     = "/main.BlockchainService/NewTransaction"
+	BlockchainService_NewBlock_FullMethodName           = "/main.BlockchainService/NewBlock"
+	BlockchainService_Ping_FullMethodName               = "/main.BlockchainService/Ping"
 )
 
 // BlockchainServiceClient is the client API for BlockchainService service.
@@ -31,6 +38,13 @@ type BlockchainServiceClient interface {
 	AddBlock(ctx context.Context, in *BlockRequest, opts ...grpc.CallOption) (*BlockResponse, error)
 	GetBlockchain(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*BlockchainResponse, error)
 	SubscribeNewBlocks(ctx context.Context, in *Empty, opts ...grpc.CallOption) (BlockchainService_SubscribeNewBlocksClient, error)
+	GetNodes(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*NodesResponse, error)
+	Welcome(ctx context.Context, in *WelcomeRequest, opts ...grpc.CallOption) (*WelcomeResponse, error)
+	GetBlocks(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*BlocksResponse, error)
+	GetTransactionPool(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TransactionPoolResponse, error)
+	NewTransaction(ctx context.Context, in *Transaction, opts ...grpc.CallOption) (*BlockResponse, error)
+	NewBlock(ctx context.Context, in *BlockRequest, opts ...grpc.CallOption) (*BlockResponse, error)
+	Ping(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PongResponse, error)
 }
 
 type blockchainServiceClient struct {
@@ -94,6 +108,76 @@ func (x *blockchainServiceSubscribeNewBlocksClient) Recv() (*Block, error) {
 	return m, nil
 }
 
+func (c *blockchainServiceClient) GetNodes(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*NodesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(NodesResponse)
+	err := c.cc.Invoke(ctx, BlockchainService_GetNodes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blockchainServiceClient) Welcome(ctx context.Context, in *WelcomeRequest, opts ...grpc.CallOption) (*WelcomeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WelcomeResponse)
+	err := c.cc.Invoke(ctx, BlockchainService_Welcome_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blockchainServiceClient) GetBlocks(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*BlocksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BlocksResponse)
+	err := c.cc.Invoke(ctx, BlockchainService_GetBlocks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blockchainServiceClient) GetTransactionPool(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TransactionPoolResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TransactionPoolResponse)
+	err := c.cc.Invoke(ctx, BlockchainService_GetTransactionPool_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blockchainServiceClient) NewTransaction(ctx context.Context, in *Transaction, opts ...grpc.CallOption) (*BlockResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BlockResponse)
+	err := c.cc.Invoke(ctx, BlockchainService_NewTransaction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blockchainServiceClient) NewBlock(ctx context.Context, in *BlockRequest, opts ...grpc.CallOption) (*BlockResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BlockResponse)
+	err := c.cc.Invoke(ctx, BlockchainService_NewBlock_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blockchainServiceClient) Ping(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PongResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PongResponse)
+	err := c.cc.Invoke(ctx, BlockchainService_Ping_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BlockchainServiceServer is the server API for BlockchainService service.
 // All implementations must embed UnimplementedBlockchainServiceServer
 // for forward compatibility
@@ -101,6 +185,13 @@ type BlockchainServiceServer interface {
 	AddBlock(context.Context, *BlockRequest) (*BlockResponse, error)
 	GetBlockchain(context.Context, *Empty) (*BlockchainResponse, error)
 	SubscribeNewBlocks(*Empty, BlockchainService_SubscribeNewBlocksServer) error
+	GetNodes(context.Context, *Empty) (*NodesResponse, error)
+	Welcome(context.Context, *WelcomeRequest) (*WelcomeResponse, error)
+	GetBlocks(context.Context, *Empty) (*BlocksResponse, error)
+	GetTransactionPool(context.Context, *Empty) (*TransactionPoolResponse, error)
+	NewTransaction(context.Context, *Transaction) (*BlockResponse, error)
+	NewBlock(context.Context, *BlockRequest) (*BlockResponse, error)
+	Ping(context.Context, *Empty) (*PongResponse, error)
 	mustEmbedUnimplementedBlockchainServiceServer()
 }
 
@@ -116,6 +207,27 @@ func (UnimplementedBlockchainServiceServer) GetBlockchain(context.Context, *Empt
 }
 func (UnimplementedBlockchainServiceServer) SubscribeNewBlocks(*Empty, BlockchainService_SubscribeNewBlocksServer) error {
 	return status.Errorf(codes.Unimplemented, "method SubscribeNewBlocks not implemented")
+}
+func (UnimplementedBlockchainServiceServer) GetNodes(context.Context, *Empty) (*NodesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetNodes not implemented")
+}
+func (UnimplementedBlockchainServiceServer) Welcome(context.Context, *WelcomeRequest) (*WelcomeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Welcome not implemented")
+}
+func (UnimplementedBlockchainServiceServer) GetBlocks(context.Context, *Empty) (*BlocksResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlocks not implemented")
+}
+func (UnimplementedBlockchainServiceServer) GetTransactionPool(context.Context, *Empty) (*TransactionPoolResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTransactionPool not implemented")
+}
+func (UnimplementedBlockchainServiceServer) NewTransaction(context.Context, *Transaction) (*BlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NewTransaction not implemented")
+}
+func (UnimplementedBlockchainServiceServer) NewBlock(context.Context, *BlockRequest) (*BlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NewBlock not implemented")
+}
+func (UnimplementedBlockchainServiceServer) Ping(context.Context, *Empty) (*PongResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
 func (UnimplementedBlockchainServiceServer) mustEmbedUnimplementedBlockchainServiceServer() {}
 
@@ -187,6 +299,132 @@ func (x *blockchainServiceSubscribeNewBlocksServer) Send(m *Block) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _BlockchainService_GetNodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlockchainServiceServer).GetNodes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BlockchainService_GetNodes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlockchainServiceServer).GetNodes(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BlockchainService_Welcome_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WelcomeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlockchainServiceServer).Welcome(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BlockchainService_Welcome_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlockchainServiceServer).Welcome(ctx, req.(*WelcomeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BlockchainService_GetBlocks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlockchainServiceServer).GetBlocks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BlockchainService_GetBlocks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlockchainServiceServer).GetBlocks(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BlockchainService_GetTransactionPool_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlockchainServiceServer).GetTransactionPool(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BlockchainService_GetTransactionPool_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlockchainServiceServer).GetTransactionPool(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BlockchainService_NewTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Transaction)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlockchainServiceServer).NewTransaction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BlockchainService_NewTransaction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlockchainServiceServer).NewTransaction(ctx, req.(*Transaction))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BlockchainService_NewBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlockchainServiceServer).NewBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BlockchainService_NewBlock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlockchainServiceServer).NewBlock(ctx, req.(*BlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BlockchainService_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlockchainServiceServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BlockchainService_Ping_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlockchainServiceServer).Ping(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BlockchainService_ServiceDesc is the grpc.ServiceDesc for BlockchainService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -201,6 +439,34 @@ var BlockchainService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBlockchain",
 			Handler:    _BlockchainService_GetBlockchain_Handler,
+		},
+		{
+			MethodName: "GetNodes",
+			Handler:    _BlockchainService_GetNodes_Handler,
+		},
+		{
+			MethodName: "Welcome",
+			Handler:    _BlockchainService_Welcome_Handler,
+		},
+		{
+			MethodName: "GetBlocks",
+			Handler:    _BlockchainService_GetBlocks_Handler,
+		},
+		{
+			MethodName: "GetTransactionPool",
+			Handler:    _BlockchainService_GetTransactionPool_Handler,
+		},
+		{
+			MethodName: "NewTransaction",
+			Handler:    _BlockchainService_NewTransaction_Handler,
+		},
+		{
+			MethodName: "NewBlock",
+			Handler:    _BlockchainService_NewBlock_Handler,
+		},
+		{
+			MethodName: "Ping",
+			Handler:    _BlockchainService_Ping_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

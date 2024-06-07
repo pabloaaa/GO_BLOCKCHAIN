@@ -8,6 +8,13 @@ service BlockchainService {
   rpc AddBlock (BlockRequest) returns (BlockResponse) {}
   rpc GetBlockchain (Empty) returns (BlockchainResponse) {}
   rpc SubscribeNewBlocks (Empty) returns (stream Block) {}
+  rpc GetNodes (Empty) returns (NodesResponse) {}
+  rpc Welcome (WelcomeRequest) returns (WelcomeResponse) {}
+  rpc GetBlocks (Empty) returns (BlocksResponse) {}
+  rpc GetTransactionPool (Empty) returns (TransactionPoolResponse) {}
+  rpc NewTransaction (Transaction) returns (BlockResponse) {}
+  rpc NewBlock (BlockRequest) returns (BlockResponse) {}
+  rpc Ping (Empty) returns (PongResponse) {}
 }
 
 message BlockRequest {
@@ -16,7 +23,7 @@ message BlockRequest {
 
 message BlockResponse {
   bool success = 1;
-  string message = 2;
+  bytes message = 2;
   Block block = 3;
 }
 
@@ -26,17 +33,41 @@ message BlockchainResponse {
   repeated Block blocks = 1;
 }
 
+message BlocksResponse {
+  repeated Block blocks = 1;
+}
+
+message TransactionPoolResponse {
+  repeated Transaction transactions = 1;
+}
+
 message Block {
   uint64 index = 1;
   uint64 timestamp = 2;
   repeated Transaction transactions = 3;
-  string previousHash = 4;
-  string hash = 5;
+  bytes previousHash = 4;
+  bytes hash = 5;
   uint64 data = 6;
 }
 
 message Transaction {
-  string sender = 1;
-  string receiver = 2;
+  bytes sender = 1;
+  bytes receiver = 2;
   double amount = 3;
+}
+
+message NodesResponse {
+  repeated bytes nodes = 1;
+}
+
+message WelcomeRequest {
+  bytes message = 1;
+}
+
+message WelcomeResponse {
+  bytes message = 1;
+}
+
+message PongResponse {
+  bool success = 1;
 }
