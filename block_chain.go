@@ -12,7 +12,6 @@ type BlockNode struct {
 	Parent *BlockNode
 	Childs []*BlockNode
 }
-
 type Blockchain struct {
 	root *BlockNode
 	mux  sync.Mutex
@@ -23,7 +22,6 @@ func NewBlockchain() *Blockchain {
 	blockchain.createGenesisBlock()
 	return blockchain
 }
-
 func (bc *Blockchain) createGenesisBlock() {
 	genesisBlock := &Block{
 		Index:        0,
@@ -38,7 +36,6 @@ func (bc *Blockchain) createGenesisBlock() {
 		Childs: make([]*BlockNode, 0),
 	}
 }
-
 func (bc *Blockchain) AddBlock(parent *BlockNode, block *Block) error {
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
@@ -56,7 +53,6 @@ func (bc *Blockchain) AddBlock(parent *BlockNode, block *Block) error {
 	parent.Childs = append(parent.Childs, blockNode)
 	return nil
 }
-
 func (bc *Blockchain) ValidateBlock(block *Block, parentBlock *Block) error {
 	if block.Index != parentBlock.Index+1 {
 		return errors.New("Block index is not valid")
@@ -73,28 +69,44 @@ func (bc *Blockchain) ValidateBlock(block *Block, parentBlock *Block) error {
 
 	return nil
 }
-
-func (bc *Blockchain) LongestChain() []*BlockNode {
+func (bc *Blockchain) convertToBlockNodes(blocks []*Block) []*BlockNode {
+	blockNodes := make([]*BlockNode, len(blocks))
+	for i, block := range blocks {
+		blockNodes[i] = &BlockNode{
+			Block:  block,
+			Parent: nil, // You need to set the correct parent here
+			Childs: make([]*BlockNode, 0),
+		}
+	}
+	return blockNodes
+}
+func (bc *Blockchain) ReplaceBlocks(blocks []*Block) {
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
 
-	var longestChain []*BlockNode
-	var maxLen int
+	blockNodes := bc.convertToBlockNodes(blocks)
+	bc.root = blockNodes[0] // Assuming the first block is the root
+}
+func (bc *Blockchain) GetLatestBlock() *Block {
+	var longestPath []*BlockNode
+	var queue [][]*BlockNode
 
-	var traverse func(node *BlockNode, chain []*BlockNode)
-	traverse = func(node *BlockNode, chain []*BlockNode) {
-		chain = append(chain, node)
+	queue = append(queue, []*BlockNode{bc.root})
 
-		if len(chain) > maxLen {
-			maxLen = len(chain)
-			longestChain = chain
+	for len(queue) > 0 {
+		path := queue[0]
+		queue = queue[1:]
+
+		if len(path) > len(longestPath) {
+			longestPath = path
 		}
 
-		for _, child := range node.Childs {
-			traverse(child, chain)
+		lastNodeInPath := path[len(path)-1]
+		for _, child := range lastNodeInPath.Childs {
+			newPath := append(path[:], child)
+			queue = append(queue, newPath)
 		}
 	}
 
-	traverse(bc.root, []*BlockNode{})
-	return longestChain
+	return longestPath[len(longestPath)-1].Block
 }

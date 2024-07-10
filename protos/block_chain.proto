@@ -4,43 +4,24 @@ package main;
 
 option go_package = "Blockchain/protos/block_chain"; 
 
-service BlockchainService {
-  rpc AddBlock (BlockRequest) returns (BlockResponse) {}
-  rpc GetBlockchain (Empty) returns (BlockchainResponse) {}
-  rpc SubscribeNewBlocks (Empty) returns (stream Block) {}
-  rpc GetNodes (Empty) returns (NodesResponse) {}
-  rpc Welcome (WelcomeRequest) returns (WelcomeResponse) {}
-  rpc GetBlocks (Empty) returns (BlocksResponse) {}
-  rpc GetTransactionPool (Empty) returns (TransactionPoolResponse) {}
-  rpc NewTransaction (Transaction) returns (BlockResponse) {}
-  rpc NewBlock (BlockRequest) returns (BlockResponse) {}
-  rpc Ping (Empty) returns (PongResponse) {}
-}
-
 message BlockRequest {
   Block block = 1;
 }
-
 message BlockResponse {
   bool success = 1;
   bytes message = 2;
   Block block = 3;
 }
-
 message Empty {}
-
 message BlockchainResponse {
   repeated Block blocks = 1;
 }
-
 message BlocksResponse {
   repeated Block blocks = 1;
 }
-
 message TransactionPoolResponse {
   repeated Transaction transactions = 1;
 }
-
 message Block {
   uint64 index = 1;
   uint64 timestamp = 2;
@@ -49,25 +30,33 @@ message Block {
   bytes hash = 5;
   uint64 data = 6;
 }
-
 message Transaction {
   bytes sender = 1;
   bytes receiver = 2;
   double amount = 3;
 }
-
 message NodesResponse {
   repeated bytes nodes = 1;
 }
-
 message WelcomeRequest {
   bytes message = 1;
 }
-
 message WelcomeResponse {
   bytes message = 1;
 }
-
 message PongResponse {
   bool success = 1;
+}
+message LatestBlockResponse {
+  Block block = 1;
+}
+message BlockUpdateRequest{
+  Block block = 1;
+}
+message BlockUpdateResponse {
+  Block block = 1;
+}
+
+message GetLatestBlockRequest {
+  // No fields, this is an empty message.
 }
