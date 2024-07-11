@@ -60,3 +60,7 @@ message BlockUpdateResponse {
 message GetLatestBlockRequest {
   // No fields, this is an empty message.
 }
+
+message GetBlockRequest {
+  bytes Hash = 1;
+}

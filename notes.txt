@@ -1,0 +1,15 @@
+Tak, kod wygląda na to, że powinien działać w ten sposób. Kiedy wysyłasz żądanie GetLatestBlock do innego węzła i otrzymujesz blok, który nie istnieje w twoim blockchainie, twój węzeł wywołuje GetBlock dla poprzedniego bloku. Ten proces powtarza się, aż dojdziemy do bloku, który już istnieje w twoim blockchainie.
+
+Następnie, dla każdego otrzymanego bloku, twój węzeł próbuje go zweryfikować za pomocą ValidateBlock i jeśli jest poprawny, dodaje go do blockchaina za pomocą AddBlock.
+
+Jednakże, istnieje kilka rzeczy, które mogą wymagać dodatkowej uwagi:
+
+1. Jeśli GetBlock jest wywoływane dla bloku, który nie istnieje w blockchainie innego węzła, nie jest jasne, co się dzieje. Może być konieczne dodanie obsługi błędów dla tego przypadku.
+
+2. Jeśli ValidateBlock zwraca błąd, nie jest jasne, co się dzieje. Może być konieczne dodanie obsługi błędów dla tego przypadku.
+
+3. Jeśli AddBlock zwraca błąd, logujesz błąd, ale proces kontynuuje. Może być konieczne dodanie obsługi błędów dla tego przypadku.
+
+4. Ten proces nie sprawdza, czy bloki są dodawane w odpowiedniej kolejności. Jeśli otrzymasz bloki w niewłaściwej kolejności, może to spowodować problemy. Może być konieczne dodanie logiki, która zapewnia, że bloki są dodawane w odpowiedniej kolejności.
+
+addblock

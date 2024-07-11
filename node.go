@@ -64,36 +64,90 @@ func (n *Node) handleConnection(conn net.Conn) {
 	// Handle the message based on its type
 	switch string(message.Type) {
 	case "WelcomeRequest":
-		// Handle Welcome message
-		welcomeRequest := &pb.WelcomeRequest{}
-		err := proto.Unmarshal(message.Data, welcomeRequest)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		n.nodes = append(n.nodes, welcomeRequest.Message)
-		n.SendAddressWelcomeResponse(conn.LocalAddr().String())
+		n.handleWelcomeRequest(message.Data, conn.LocalAddr().String())
 	case "WelcomeResponse":
-		// Handle WelcomeResponse message
-		welcomeResponse := &pb.WelcomeResponse{}
-		err := proto.Unmarshal(message.Data, welcomeResponse)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		n.AddNodes(welcomeResponse.Message)
+		n.handleWelcomeResponse(message.Data)
 	case "GetLatestBlock":
-		// Handle GetLatestBlock message
-		getLatestBlockRequest := &pb.GetLatestBlockRequest{}
-		err := proto.Unmarshal(message.Data, getLatestBlockRequest)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		n.SendLatestBlock(conn.LocalAddr().String())
+		n.handleGetLatestBlock(message.Data, conn.LocalAddr().String())
+	case "BlockResponse":
+		n.handleBlockResponse(message.Data, conn.LocalAddr().String())
+	case "GetBlockRequest":
+		n.handleGetBlockRequest(message.Data, conn.LocalAddr().String())
 	}
-
 }
+
+func (n *Node) handleWelcomeRequest(data []byte, address string) {
+	welcomeRequest := &pb.WelcomeRequest{}
+	err := proto.Unmarshal(data, welcomeRequest)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	n.nodes = append(n.nodes, welcomeRequest.Message)
+	n.SendAddressWelcomeResponse(address)
+}
+
+func (n *Node) handleWelcomeResponse(data []byte) {
+	welcomeResponse := &pb.WelcomeResponse{}
+	err := proto.Unmarshal(data, welcomeResponse)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	n.AddNodes(welcomeResponse.Message)
+}
+
+func (n *Node) handleGetLatestBlock(data []byte, address string) {
+	getLatestBlockRequest := &pb.GetLatestBlockRequest{}
+	err := proto.Unmarshal(data, getLatestBlockRequest)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	n.SendLatestBlock(address)
+}
+
+func (n *Node) handleBlockResponse(data []byte, address string) {
+	blockResponse := &pb.BlockResponse{}
+	err := proto.Unmarshal(data, blockResponse)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	block := BlockFromProto(blockResponse.GetBlock())
+	blockHash := block.calculateHash()
+	if !n.blockchain.BlockExists(blockHash) {
+		n.GetBlock(address, block.PreviousHash)
+	} else {
+		parent := n.blockchain.GetBlock(block.PreviousHash)
+		if parent != nil {
+			// Validate the block before adding it to the blockchain
+			err := n.blockchain.ValidateBlock(block, parent.Block)
+			if err != nil {
+				log.Println("Received invalid block: ", err)
+			} else {
+				err := n.blockchain.AddBlock(parent, block)
+				if err != nil {
+					log.Println(err)
+				}
+			}
+		}
+	}
+}
+
+func (n *Node) handleGetBlockRequest(data []byte, address string) {
+	getBlockRequest := &pb.GetBlockRequest{}
+	err := proto.Unmarshal(data, getBlockRequest)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	block := n.blockchain.GetBlock(getBlockRequest.Hash)
+	if block != nil {
+		n.SendBlock(address, block)
+	}
+}
+
 func (n *Node) BroadcastAddress(address []byte) {
 	for _, node := range n.nodes {
 		conn, err := net.Dial("tcp", string(node))
@@ -113,6 +167,7 @@ func (n *Node) BroadcastAddress(address []byte) {
 		}
 	}
 }
+
 func encodeMessage(conn net.Conn, messageType string, messageData proto.Message) error {
 	data, err := proto.Marshal(messageData)
 	if err != nil {
@@ -132,6 +187,7 @@ func encodeMessage(conn net.Conn, messageType string, messageData proto.Message)
 
 	return nil
 }
+
 func (n *Node) SendAddressWelcomeResponse(address string) {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
@@ -151,6 +207,7 @@ func (n *Node) SendAddressWelcomeResponse(address string) {
 		log.Fatal(err)
 	}
 }
+
 func (n *Node) GetLatestBlock(address string) {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
@@ -165,6 +222,7 @@ func (n *Node) GetLatestBlock(address string) {
 		log.Printf("Failed to encode message: %v", err)
 	}
 }
+
 func (n *Node) AddNodes(address []byte) {
 	for _, node := range n.nodes {
 		if bytes.Equal(node, address) {
@@ -173,6 +231,7 @@ func (n *Node) AddNodes(address []byte) {
 	}
 	n.nodes = append(n.nodes, address)
 }
+
 func (n *Node) BroadcastLatestBlock() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -184,6 +243,7 @@ func (n *Node) BroadcastLatestBlock() {
 		}
 	}
 }
+
 func (n *Node) getRandomNodes(count int) [][]byte {
 	if count > len(n.nodes) {
 		count = len(n.nodes)
@@ -195,6 +255,7 @@ func (n *Node) getRandomNodes(count int) [][]byte {
 
 	return n.nodes[:count]
 }
+
 func (n *Node) SendLatestBlock(address string) {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
@@ -210,6 +271,46 @@ func (n *Node) SendLatestBlock(address string) {
 	blockResponse := &pb.BlockResponse{
 		Success: true,
 		Message: []byte("Latest block"),
+		Block:   protoBlock,
+	}
+
+	err = encodeMessage(conn, "BlockResponse", blockResponse)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (n *Node) GetBlock(address string, blockHash []byte) {
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		log.Printf("Failed to dial node at address %s: %v", address, err)
+		return
+	}
+	defer conn.Close()
+
+	getBlockRequest := &pb.GetBlockRequest{
+		Hash: blockHash,
+	}
+
+	err = encodeMessage(conn, "GetBlock", getBlockRequest)
+	if err != nil {
+		log.Printf("Failed to encode message: %v", err)
+	}
+}
+
+func (n *Node) SendBlock(address string, blockNode *BlockNode) {
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	// Convert block to pb.Block format
+	protoBlock := blockNode.Block.ToProto()
+
+	blockResponse := &pb.BlockResponse{
+		Success: true,
+		Message: []byte("Block"),
 		Block:   protoBlock,
 	}
 
