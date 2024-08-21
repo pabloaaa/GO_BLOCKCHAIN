@@ -62,8 +62,8 @@ func (bc *Blockchain) ValidateBlock(block *Block, parentBlock *Block) error {
 		return errors.New("Previous hash is not valid")
 	}
 
-	hashPrefix := block.calculateHash()[:2]
-	if !bytes.Equal(hashPrefix, []byte("00")) {
+	hashPrefix := block.calculateHash()[:3]
+	if !bytes.Equal(hashPrefix, []byte("000")) {
 		return errors.New("Block hash is not valid")
 	}
 
@@ -128,5 +128,8 @@ func (bc *Blockchain) GetLatestBlock() *Block {
 		}
 		return false
 	})
+	if len(longestPath) == 0 {
+		return bc.root.Block
+	}
 	return longestPath[len(longestPath)-1].Block
 }

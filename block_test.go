@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"reflect"
 	"testing"
 
 	pb "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
@@ -9,75 +11,49 @@ import (
 func setup() *Block {
 	transactions := []Transaction{
 		{
-			Sender:   "Alice",
-			Receiver: "Bob",
+			Sender:   []byte("Alice"),
+			Receiver: []byte("Bob"),
 			Amount:   10.0,
 		},
 	}
-	return NewBlock(1, 123456789, transactions, "previousHash", 0)
-}
-
-func TestNewBlock(t *testing.T) {
-	block := setup()
-
-	if block.Index != 1 {
-		t.Errorf("Expected block index to be %d, but got %d", 1, block.Index)
-	}
-
-	if block.Timestamp != 123456789 {
-		t.Errorf("Expected block timestamp to be %d, but got %d", 123456789, block.Timestamp)
-	}
-
-	if block.PreviousHash != "previousHash" {
-		t.Errorf("Expected block previous hash to be '%s', but got %s", "previousHash", block.PreviousHash)
-	}
-
-	if len(block.Transactions) != 1 {
-		t.Errorf("Expected block to have %d transaction, but got %d", 1, len(block.Transactions))
-	}
-
-	if block.Data != 0 {
-		t.Errorf("Expected block data to be %d, but got %d", 0, block.Data)
-	}
-
-	if block.Hash == "" {
-		t.Errorf("Expected block hash to be calculated, but got an empty string")
+	return &Block{
+		Index:        1,
+		Timestamp:    123456789,
+		Transactions: transactions,
+		PreviousHash: []byte("previousHash"),
+		Data:         0,
 	}
 }
 
 func TestCalculateHash(t *testing.T) {
 	block := setup()
-	originalHash := block.Hash
+	expectedHash := sha256.Sum256([]byte("1123456789AliceBob10previousHash0"))
+	calculatedHash := block.calculateHash()
 
-	// Change the state of the block
-	block.Data++
-	block.calculateHash()
-	if block.Hash == "" || block.Hash == originalHash {
-		t.Errorf("Expected block hash to be calculated, but got %s", block.Hash)
+	if !reflect.DeepEqual(calculatedHash, expectedHash[:]) {
+		t.Errorf("Expected hash %x, but got %x", expectedHash, calculatedHash)
 	}
+}
 
-	// Reset block state and test with different field
-	block = setup()
-	originalHash = block.Hash
-	block.Index++
-	block.calculateHash()
-	if block.Hash == "" || block.Hash == originalHash {
-		t.Errorf("Expected block hash to be calculated, but got %s", block.Hash)
+func TestSetData(t *testing.T) {
+	block := setup()
+	block.SetData(42)
+
+	if block.Data != 42 {
+		t.Errorf("Expected block data to be 42, but got %d", block.Data)
 	}
-
-	// Repeat for other fields as needed...
 }
 
 func TestBlockFromProto(t *testing.T) {
 	pbBlock := &pb.Block{
 		Index:        1,
 		Timestamp:    123456789,
-		PreviousHash: "previousHash",
-		Hash:         "hash",
+		PreviousHash: []byte("previousHash"),
+		Hash:         []byte("hash"),
 		Transactions: []*pb.Transaction{
 			{
-				Sender:   "Alice",
-				Receiver: "Bob",
+				Sender:   []byte("Alice"),
+				Receiver: []byte("Bob"),
 				Amount:   10.0,
 			},
 		},
@@ -91,11 +67,8 @@ func TestBlockFromProto(t *testing.T) {
 	if block.Timestamp != pbBlock.GetTimestamp() {
 		t.Errorf("Expected %d, got %d", pbBlock.GetTimestamp(), block.Timestamp)
 	}
-	if block.PreviousHash != pbBlock.GetPreviousHash() {
+	if string(block.PreviousHash) != string(pbBlock.GetPreviousHash()) {
 		t.Errorf("Expected %s, got %s", pbBlock.GetPreviousHash(), block.PreviousHash)
-	}
-	if block.Hash != pbBlock.GetHash() {
-		t.Errorf("Expected %s, got %s", pbBlock.GetHash(), block.Hash)
 	}
 	if len(block.Transactions) != len(pbBlock.GetTransactions()) {
 		t.Errorf("Expected %d, got %d", len(pbBlock.GetTransactions()), len(block.Transactions))
@@ -115,11 +88,8 @@ func TestToProto(t *testing.T) {
 	if pbBlock.GetTimestamp() != block.Timestamp {
 		t.Errorf("Expected %d, got %d", block.Timestamp, pbBlock.GetTimestamp())
 	}
-	if pbBlock.GetPreviousHash() != block.PreviousHash {
+	if string(pbBlock.GetPreviousHash()) != string(block.PreviousHash) {
 		t.Errorf("Expected %s, got %s", block.PreviousHash, pbBlock.GetPreviousHash())
-	}
-	if pbBlock.GetHash() != block.Hash {
-		t.Errorf("Expected %s, got %s", block.Hash, pbBlock.GetHash())
 	}
 	if len(pbBlock.GetTransactions()) != len(block.Transactions) {
 		t.Errorf("Expected %d, got %d", len(block.Transactions), len(pbBlock.GetTransactions()))
