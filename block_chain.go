@@ -133,3 +133,15 @@ func (bc *Blockchain) GetLatestBlock() *Block {
 	}
 	return longestPath[len(longestPath)-1].Block
 }
+
+func (bc *Blockchain) GenerateNewBlock(transaction []Transaction) *Block {
+	latestBlock := bc.GetLatestBlock()
+	newBlock := &Block{
+		Index:        latestBlock.Index + 1,
+		Timestamp:    uint64(time.Now().Unix()),
+		Transactions: transaction,
+		PreviousHash: latestBlock.calculateHash(),
+		Data:         0,
+	}
+	return newBlock
+}

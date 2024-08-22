@@ -37,6 +37,7 @@ func (n *Node) Start(address []byte) {
 	defer ln.Close()
 
 	n.BroadcastAddress(address)
+	go n.TryToFindNewBlock()
 
 	go n.BroadcastLatestBlock()
 
@@ -317,5 +318,27 @@ func (n *Node) SendBlock(address string, blockNode *BlockNode) {
 	err = encodeMessage(conn, "BlockResponse", blockResponse)
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func (n *Node) TryToFindNewBlock() {
+	for {
+		transaction := []Transaction{
+			{Sender: []byte("Alice"), Receiver: []byte("Bob"), Amount: 10},
+		}
+		newBlock := n.blockchain.GenerateNewBlock(transaction)
+		nonce := uint64(0)
+
+		for {
+			newBlock.SetData(nonce)
+			parentBlock := n.blockchain.GetLatestBlock()
+			if err := n.blockchain.ValidateBlock(newBlock, parentBlock); err == nil {
+				break
+			}
+			nonce++
+		}
+
+		n.blockchain.AddBlock(n.blockchain.root, newBlock)
+		time.Sleep(10 * time.Second)
 	}
 }
