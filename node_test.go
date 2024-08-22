@@ -109,6 +109,7 @@ func TestNodeStart(t *testing.T) {
 func TestNodeSync(t *testing.T) {
 	// Tworzymy dwa blockchainy
 	blockchain1 := NewBlockchain()
+
 	blockchain2 := NewBlockchain()
 
 	// Dodajemy bloki do blockchainów
