@@ -10,3 +10,11 @@ import (
 type MessageHandler interface {
 	Handle(msg *block_chain.MainMessage, conn net.Conn)
 }
+
+type BlockMessageHandler interface {
+	HandleBlockMessage(msg *block_chain.BlockMessage, conn net.Conn)
+}
+
+type NodeMessageHandler interface {
+	HandleNodeMessage(msg *block_chain.NodeMessage, conn net.Conn)
+}

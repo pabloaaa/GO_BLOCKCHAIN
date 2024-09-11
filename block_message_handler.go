@@ -4,29 +4,30 @@ import (
 	"log"
 	"net"
 
+	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 	"google.golang.org/protobuf/proto"
 )
 
-type BlockMessageHandler struct {
+type BlockMessageHandlerImpl struct {
 	blockchain *Blockchain
 }
 
-func NewBlockMessageHandler(blockchain *Blockchain) *BlockMessageHandler {
-	return &BlockMessageHandler{blockchain: blockchain}
+func NewBlockMessageHandler(blockchain *Blockchain) *BlockMessageHandlerImpl {
+	return &BlockMessageHandlerImpl{blockchain: blockchain}
 }
 
-func (h *BlockMessageHandler) Handle(msg *block_chain.BlockMessage, conn net.Conn) {
+func (h *BlockMessageHandlerImpl) HandleBlockMessage(msg *block_chain.BlockMessage, conn net.Conn) {
 	switch blockMsg := msg.BlockMessageType.(type) {
 	case *block_chain.BlockMessage_GetLatestBlockRequest:
 		h.handleGetLatestBlock(nil, conn.LocalAddr().String())
-	case *block_chain.BlockMessage_GetBlockRequest:
-		h.handleGetBlockRequest(blockMsg.GetBlockRequest.Hash, conn.LocalAddr().String())
+	case *block_chain.BlockMessage_GetBlockRequest_:
+		h.handleGetBlockRequest(blockMsg.GetBlockRequest_.Hash, conn.LocalAddr().String())
 	case *block_chain.BlockMessage_BlockResponse:
 		h.handleBlockResponse(blockMsg.BlockResponse.Message, conn.LocalAddr().String())
 	}
 }
 
-func (h *BlockMessageHandler) handleGetLatestBlock(data []byte, address string) {
+func (h *BlockMessageHandlerImpl) handleGetLatestBlock(data []byte, address string) {
 	getLatestBlockRequest := &block_chain.GetLatestBlockRequest{}
 	err := proto.Unmarshal(data, getLatestBlockRequest)
 	if err != nil {
@@ -36,7 +37,7 @@ func (h *BlockMessageHandler) handleGetLatestBlock(data []byte, address string) 
 	h.SendLatestBlock(address)
 }
 
-func (h *BlockMessageHandler) handleGetBlockRequest(hash []byte, address string) {
+func (h *BlockMessageHandlerImpl) handleGetBlockRequest(hash []byte, address string) {
 	getBlockRequest := &block_chain.GetBlockRequest{Hash: hash}
 	block := h.blockchain.GetBlock(getBlockRequest.GetHash())
 	if block != nil {
@@ -44,7 +45,7 @@ func (h *BlockMessageHandler) handleGetBlockRequest(hash []byte, address string)
 	}
 }
 
-func (h *BlockMessageHandler) handleBlockResponse(data []byte, address string) {
+func (h *BlockMessageHandlerImpl) handleBlockResponse(data []byte, address string) {
 	blockResponse := &block_chain.BlockResponse{}
 	err := proto.Unmarshal(data, blockResponse)
 	if err != nil {
@@ -72,7 +73,7 @@ func (h *BlockMessageHandler) handleBlockResponse(data []byte, address string) {
 	}
 }
 
-func (h *BlockMessageHandler) SendBlock(address string, blockNode *BlockNode) {
+func (h *BlockMessageHandlerImpl) SendBlock(address string, blockNode *BlockNode) {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		log.Fatal(err)
@@ -94,7 +95,7 @@ func (h *BlockMessageHandler) SendBlock(address string, blockNode *BlockNode) {
 	}
 }
 
-func (h *BlockMessageHandler) SendLatestBlock(address string) {
+func (h *BlockMessageHandlerImpl) SendLatestBlock(address string) {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		log.Fatal(err)
@@ -118,7 +119,7 @@ func (h *BlockMessageHandler) SendLatestBlock(address string) {
 	}
 }
 
-func (h *BlockMessageHandler) GetBlock(address string, blockHash []byte) {
+func (h *BlockMessageHandlerImpl) GetBlock(address string, blockHash []byte) {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		log.Printf("Failed to dial node at address %s: %v", address, err)
@@ -136,7 +137,7 @@ func (h *BlockMessageHandler) GetBlock(address string, blockHash []byte) {
 	}
 }
 
-func (h *BlockMessageHandler) GetLatestBlock(address string) {
+func (h *BlockMessageHandlerImpl) GetLatestBlock(address string) {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		log.Printf("Failed to dial node at address %s: %v", address, err)

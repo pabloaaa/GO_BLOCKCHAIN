@@ -18,8 +18,8 @@ type Message struct {
 type Node struct {
 	blockchain   *Blockchain
 	nodes        [][]byte
-	blockHandler MessageHandler
-	nodeHandler  MessageHandler
+	blockHandler BlockMessageHandler
+	nodeHandler  NodeMessageHandler
 }
 
 func NewNode(blockchain *Blockchain) *Node {
@@ -28,7 +28,7 @@ func NewNode(blockchain *Blockchain) *Node {
 		nodes:      make([][]byte, 0),
 	}
 	node.blockHandler = NewBlockMessageHandler(blockchain)
-	node.nodeHandler = NewNodeMessageHandler(node) // Ensure NewNodeMessageHandler returns a type that implements MessageHandler
+	node.nodeHandler = NewNodeMessageHandler(node)
 	return node
 }
 
@@ -72,9 +72,9 @@ func (n *Node) handleConnection(conn net.Conn) {
 
 	switch msg := message.MessageType.(type) {
 	case *block_chain.MainMessage_BlockMessage:
-		n.blockHandler.Handle(msg.BlockMessage, conn)
+		n.blockHandler.HandleBlockMessage(msg.BlockMessage, conn)
 	case *block_chain.MainMessage_NodeMessage:
-		n.nodeHandler.Handle(msg.NodeMessage, conn)
+		n.nodeHandler.HandleNodeMessage(msg.NodeMessage, conn)
 	}
 }
 

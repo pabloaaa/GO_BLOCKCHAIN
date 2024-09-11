@@ -9,24 +9,20 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type NodeMessageHandler struct {
+type NodeMessageHandlerImpl struct {
 	node *Node
 }
 
-func NewNodeMessageHandler(node *Node) *NodeMessageHandler {
-	return &NodeMessageHandler{node: node}
+func NewNodeMessageHandler(node *Node) *NodeMessageHandlerImpl {
+	return &NodeMessageHandlerImpl{node: node}
 }
 
-func (h *NodeMessageHandler) Handle(msg *block_chain.MainMessage, conn net.Conn) {
-	switch nodeMsg := msg.MessageType.(type) {
-	case *block_chain.MainMessage_NodeMessage:
-		switch nodeMsg.NodeMessage.NodeMessageType.(type) {
-		case *block_chain.NodeMessage_WelcomeRequest:
-			h.node.handleWelcomeRequest(nodeMsg.NodeMessage.GetWelcomeRequest().Message, conn.LocalAddr().String())
-		case *block_chain.NodeMessage_WelcomeResponse:
-			h.node.handleWelcomeResponse(nodeMsg.NodeMessage.GetWelcomeResponse().Message)
-			// Add other cases for different NodeMessage types
-		}
+func (h *NodeMessageHandlerImpl) HandleNodeMessage(msg *block_chain.NodeMessage, conn net.Conn) {
+	switch nodeMsg := msg.NodeMessageType.(type) {
+	case *block_chain.NodeMessage_WelcomeRequest:
+		h.node.handleWelcomeRequest(nodeMsg.WelcomeRequest.Message, conn.LocalAddr().String())
+	case *block_chain.NodeMessage_WelcomeResponse:
+		h.node.handleWelcomeResponse(nodeMsg.WelcomeResponse.Message)
 	}
 }
 

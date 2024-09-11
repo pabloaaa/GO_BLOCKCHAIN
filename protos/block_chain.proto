@@ -108,4 +108,4 @@ message GetBlockRequest {
   bytes hash = 1;
 }
 
-/******************************** BLOCK MESSAGES */
+/******************************** BLOCK MESSAGES */f
