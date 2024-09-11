@@ -4,37 +4,42 @@ package main;
 
 option go_package = "Blockchain/protos/block_chain"; 
 
-message BlockRequest {
-  Block block = 1;
+// Main message containing two types
+message MainMessage {
+  oneof message_type {
+    BlockMessage block_message = 1;
+    NodeMessage node_message = 2;
+  }
 }
-message BlockResponse {
-  bool success = 1;
-  bytes message = 2;
-  Block block = 3;
+
+// Block-related messages
+message BlockMessage {
+  oneof block_message_type {
+    BlockRequest block_request = 1;
+    BlockResponse block_response = 2;
+    BlockchainResponse blockchain_response = 3;
+    BlocksResponse blocks_response = 4;
+    TransactionPoolResponse transaction_pool_response = 5;
+    LatestBlockResponse latest_block_response = 6;
+    BlockUpdateRequest block_update_request = 7;
+    BlockUpdateResponse block_update_response = 8;
+    GetLatestBlockRequest get_latest_block_request = 9;
+    GetBlockRequest get_block_request = 10;
+  }
 }
-message Empty {}
-message BlockchainResponse {
-  repeated Block blocks = 1;
+
+// Node-related messages
+message NodeMessage {
+  oneof node_message_type {
+    NodesResponse nodes_response = 1;
+    WelcomeRequest welcome_request = 2;
+    WelcomeResponse welcome_response = 3;
+    PongResponse pong_response = 4;
+  }
 }
-message BlocksResponse {
-  repeated Block blocks = 1;
-}
-message TransactionPoolResponse {
-  repeated Transaction transactions = 1;
-}
-message Block {
-  uint64 index = 1;
-  uint64 timestamp = 2;
-  repeated Transaction transactions = 3;
-  bytes previousHash = 4;
-  bytes hash = 5;
-  uint64 data = 6;
-}
-message Transaction {
-  bytes sender = 1;
-  bytes receiver = 2;
-  double amount = 3;
-}
+
+//******************************** NODE MESSAGES */
+
 message NodesResponse {
   repeated bytes nodes = 1;
 }
@@ -47,6 +52,44 @@ message WelcomeResponse {
 message PongResponse {
   bool success = 1;
 }
+/********************************  NODE MESSAGES */
+
+/******************************** BLOCK MESSAGES */
+message BlockRequest {
+  Block block = 1;
+}
+message BlockResponse {
+  bool success = 1;
+  bytes message = 2;
+  Block block = 3;
+}
+message Empty {}
+
+message Block {
+  uint64 index = 1;
+  uint64 timestamp = 2;
+  repeated Transaction transactions = 3;
+  bytes previousHash = 4;
+  bytes hash = 5;
+  uint64 data = 6;
+  bool checkpoint = 7; // Added this line
+}
+message Transaction {
+  bytes sender = 1;
+  bytes receiver = 2;
+  double amount = 3;
+}
+
+message BlockchainResponse {
+  repeated Block blocks = 1;
+}
+message BlocksResponse {
+  repeated Block blocks = 1;
+}
+message TransactionPoolResponse {
+  repeated Transaction transactions = 1;
+}
+
 message LatestBlockResponse {
   Block block = 1;
 }
@@ -62,5 +105,7 @@ message GetLatestBlockRequest {
 }
 
 message GetBlockRequest {
-  bytes Hash = 1;
+  bytes hash = 1;
 }
+
+/******************************** BLOCK MESSAGES */

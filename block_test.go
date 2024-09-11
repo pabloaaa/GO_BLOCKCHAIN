@@ -22,6 +22,7 @@ func setup() *Block {
 		Transactions: transactions,
 		PreviousHash: []byte("previousHash"),
 		Data:         0,
+		Checkpoint:   false,
 	}
 }
 
@@ -57,7 +58,8 @@ func TestBlockFromProto(t *testing.T) {
 				Amount:   10.0,
 			},
 		},
-		Data: 0,
+		Data:       0,
+		Checkpoint: true,
 	}
 	block := BlockFromProto(pbBlock)
 
@@ -75,6 +77,9 @@ func TestBlockFromProto(t *testing.T) {
 	}
 	if block.Data != pbBlock.GetData() {
 		t.Errorf("Expected %d, got %d", pbBlock.GetData(), block.Data)
+	}
+	if block.Checkpoint != pbBlock.GetCheckpoint() {
+		t.Errorf("Expected %v, got %v", pbBlock.GetCheckpoint(), block.Checkpoint)
 	}
 }
 
@@ -96,5 +101,8 @@ func TestToProto(t *testing.T) {
 	}
 	if pbBlock.GetData() != block.Data {
 		t.Errorf("Expected %d, got %d", block.Data, pbBlock.GetData())
+	}
+	if pbBlock.GetCheckpoint() != block.Checkpoint {
+		t.Errorf("Expected %v, got %v", block.Checkpoint, pbBlock.GetCheckpoint())
 	}
 }

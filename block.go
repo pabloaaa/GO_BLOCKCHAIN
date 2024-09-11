@@ -20,6 +20,7 @@ type Block struct {
 	PreviousHash []byte
 	Transactions []Transaction
 	Data         uint64
+	Checkpoint   bool
 }
 
 func (b *Block) calculateHash() []byte {
@@ -52,6 +53,7 @@ func BlockFromProto(pbBlock *pb.Block) *Block {
 		PreviousHash: pbBlock.GetPreviousHash(),
 		Transactions: transactions,
 		Data:         pbBlock.GetData(),
+		Checkpoint:   pbBlock.GetCheckpoint(),
 	}
 }
 
@@ -71,5 +73,6 @@ func (b *Block) ToProto() *pb.Block {
 		PreviousHash: b.PreviousHash,
 		Transactions: pbTransactions,
 		Data:         b.Data,
+		Checkpoint:   b.Checkpoint,
 	}
 }

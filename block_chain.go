@@ -51,7 +51,17 @@ func (bc *Blockchain) AddBlock(parent *BlockNode, block *Block) error {
 	}
 
 	parent.Childs = append(parent.Childs, blockNode)
+
+	// Call ApproveBlock to check and set checkpoint
+	bc.ApproveBlock(blockNode)
+
 	return nil
+}
+
+func (bc *Blockchain) ApproveBlock(blockNode *BlockNode) {
+	if blockNode.Block.Index%10 == 0 {
+		blockNode.Block.Checkpoint = true
+	}
 }
 func (bc *Blockchain) ValidateBlock(block *Block, parentBlock *Block) error {
 	if block.Index != parentBlock.Index+1 {
