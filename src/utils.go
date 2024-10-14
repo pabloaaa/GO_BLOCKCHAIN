@@ -1,5 +1,4 @@
-// utils.go
-package main
+package src
 
 import (
 	"net"
