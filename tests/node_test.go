@@ -7,11 +7,12 @@ import (
 	"time"
 
 	pb "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
+	. "github.com/pabloaaa/GO_BLOCKCHAIN/src"
 )
 
 func startNode(node *Node, address string) {
 	go node.Start([]byte(address))
-	time.Sleep(1 * time.Second) // Czekamy, aby serwer się uruchomił
+	time.Sleep(1 * time.Second)
 }
 
 func sendWelcomeRequest(node *Node, address string) {
@@ -25,7 +26,7 @@ func sendWelcomeRequest(node *Node, address string) {
 		Message: []byte(address),
 	}
 
-	err = encodeMessage(conn, "WelcomeRequest", welcomeRequest)
+	err = EncodeMessage(conn, welcomeRequest)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,8 +39,8 @@ func requestLatestBlock(node *Node, address string) {
 	}
 	defer conn.Close()
 
-	emptyMessage := &pb.Empty{}
-	err = encodeMessage(conn, "GetLatestBlock", emptyMessage)
+	emptyMessage := &pb.GetLatestBlockRequest{}
+	err = EncodeMessage(conn, emptyMessage)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -56,7 +57,7 @@ func generateBlocks(num int) []*Block {
 			Data:         uint64(i),
 		}
 		if i > 0 {
-			block.PreviousHash = blocks[i-1].calculateHash()
+			block.PreviousHash = blocks[i-1].CalculateHash()
 		}
 		blocks[i] = block
 	}
@@ -68,12 +69,12 @@ func TestNewNode(t *testing.T) {
 
 	node := NewNode(blockchain)
 
-	if node.blockchain != blockchain {
-		t.Errorf("Expected blockchain to be %v, but got %v", blockchain, node.blockchain)
+	if node.GetBlockchain() != blockchain {
+		t.Errorf("Expected blockchain to be %v, but got %v", blockchain, node.GetBlockchain())
 	}
 
-	if len(node.nodes) != 0 {
-		t.Errorf("Expected nodes list to be empty, but got %d nodes", len(node.nodes))
+	if len(node.GetNodes()) != 0 {
+		t.Errorf("Expected nodes list to be empty, but got %d nodes", len(node.GetNodes()))
 	}
 }
 
@@ -109,15 +110,14 @@ func TestNodeStart(t *testing.T) {
 func TestNodeSync(t *testing.T) {
 	// Tworzymy dwa blockchainy
 	blockchain1 := NewBlockchain()
-
 	blockchain2 := NewBlockchain()
 
 	// Dodajemy bloki do blockchainów
 	for _, block := range generateBlocks(3) {
-		blockchain1.AddBlock(blockchain1.root, block)
+		blockchain1.AddBlock(blockchain1.GetRoot(), block)
 	}
 	for _, block := range generateBlocks(7) {
-		blockchain2.AddBlock(blockchain2.root, block)
+		blockchain2.AddBlock(blockchain2.GetRoot(), block)
 	}
 
 	// Tworzymy dwa nody
@@ -139,7 +139,7 @@ func TestNodeSync(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Sprawdzamy, czy oba nody mają teraz taką samą liczbę bloków
-	if len(node1.blockchain.root.Childs) != len(node2.blockchain.root.Childs) {
-		t.Errorf("Expected both nodes to have the same number of blocks, but got %d and %d", len(node1.blockchain.root.Childs), len(node2.blockchain.root.Childs))
+	if len(node1.GetBlockchain().GetRoot().Childs) != len(node2.GetBlockchain().GetRoot().Childs) {
+		t.Errorf("Expected both nodes to have the same number of blocks, but got %d and %d", len(node1.GetBlockchain().GetRoot().Childs), len(node2.GetBlockchain().GetRoot().Childs))
 	}
 }

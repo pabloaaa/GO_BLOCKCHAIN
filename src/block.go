@@ -23,7 +23,7 @@ type Block struct {
 	Checkpoint   bool
 }
 
-func (b *Block) calculateHash() []byte {
+func (b *Block) CalculateHash() []byte {
 	var transactionsStrings []string
 	for _, t := range b.Transactions {
 		transactionsStrings = append(transactionsStrings, string(t.Sender)+string(t.Receiver)+strconv.FormatFloat(t.Amount, 'f', -1, 32))

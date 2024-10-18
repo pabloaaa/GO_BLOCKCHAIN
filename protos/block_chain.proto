@@ -25,6 +25,7 @@ message BlockMessage {
     BlockUpdateResponse block_update_response = 8;
     GetLatestBlockRequest get_latest_block_request = 9;
     GetBlockRequest get_block_request = 10;
+    Empty empty = 11;
   }
 }
 
@@ -35,6 +36,7 @@ message NodeMessage {
     WelcomeRequest welcome_request = 2;
     WelcomeResponse welcome_response = 3;
     PongResponse pong_response = 4;
+    Empty empty = 5;
   }
 }
 
@@ -108,4 +110,4 @@ message GetBlockRequest {
   bytes hash = 1;
 }
 
-/******************************** BLOCK MESSAGES */f
+/******************************** BLOCK MESSAGES */

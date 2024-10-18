@@ -6,6 +6,6 @@ import (
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 )
 
-type NodeMessageHandler interface {
+type NodeMessageHandlerInterface interface {
 	HandleNodeMessage(msg *block_chain.NodeMessage, conn net.Conn)
 }

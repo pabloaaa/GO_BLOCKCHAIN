@@ -6,7 +6,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func encodeMessage(conn net.Conn, messageType string, message proto.Message) error {
+func EncodeMessage(conn net.Conn, message proto.Message) error {
 	data, err := proto.Marshal(message)
 	if err != nil {
 		return err

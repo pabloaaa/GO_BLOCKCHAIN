@@ -60,7 +60,13 @@ func (n *Node) BroadcastAddress(address []byte) {
 			Message: address,
 		}
 
-		err = encodeMessage(conn, "WelcomeRequest", welcomeRequest)
+		nodeMessage := &block_chain.NodeMessage{
+			NodeMessageType: &block_chain.NodeMessage_WelcomeRequest{
+				WelcomeRequest: welcomeRequest,
+			},
+		}
+
+		err = EncodeMessage(conn, nodeMessage)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -80,7 +86,13 @@ func (n *Node) SendAddressWelcomeResponse(address string) {
 		Message: nodes,
 	}
 
-	err = encodeMessage(conn, "WelcomeResponse", welcomeResponse)
+	nodeMessage := &block_chain.NodeMessage{
+		NodeMessageType: &block_chain.NodeMessage_WelcomeResponse{
+			WelcomeResponse: welcomeResponse,
+		},
+	}
+
+	err = EncodeMessage(conn, nodeMessage)
 	if err != nil {
 		log.Fatal(err)
 	}

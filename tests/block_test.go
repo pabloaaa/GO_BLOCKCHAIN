@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	pb "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
+	. "github.com/pabloaaa/GO_BLOCKCHAIN/src"
 )
 
 func setup() *Block {
@@ -29,7 +30,7 @@ func setup() *Block {
 func TestCalculateHash(t *testing.T) {
 	block := setup()
 	expectedHash := sha256.Sum256([]byte("1123456789AliceBob10previousHash0"))
-	calculatedHash := block.calculateHash()
+	calculatedHash := block.CalculateHash()
 
 	if !reflect.DeepEqual(calculatedHash, expectedHash[:]) {
 		t.Errorf("Expected hash %x, but got %x", expectedHash, calculatedHash)

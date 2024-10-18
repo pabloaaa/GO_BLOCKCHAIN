@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/pabloaaa/GO_BLOCKCHAIN/interfaces"
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 	"google.golang.org/protobuf/proto"
 )
@@ -18,8 +19,8 @@ type Message struct {
 type Node struct {
 	blockchain   *Blockchain
 	nodes        [][]byte
-	blockHandler BlockMessageHandler
-	nodeHandler  NodeMessageHandler
+	blockHandler interfaces.BlockMessageHandlerInterface
+	nodeHandler  interfaces.NodeMessageHandlerInterface
 }
 
 func NewNode(blockchain *Blockchain) *Node {
@@ -32,6 +33,14 @@ func NewNode(blockchain *Blockchain) *Node {
 	return node
 }
 
+func (n *Node) GetBlockchain() *Blockchain {
+	return n.blockchain
+}
+
+func (n *Node) GetNodes() [][]byte {
+	return n.nodes
+}
+
 func (n *Node) Start(address []byte) {
 	ln, err := net.Listen("tcp", string(address))
 	if err != nil {
@@ -42,7 +51,7 @@ func (n *Node) Start(address []byte) {
 	n.BroadcastAddress(address)
 	go n.TryToFindNewBlock()
 
-	go n.BroadcastLatestBlock() // Implement this method
+	go n.blockHandler.BroadcastLatestBlock(n.nodes) // Implement this method
 
 	for {
 		conn, err := ln.Accept()
@@ -63,19 +72,21 @@ func (n *Node) handleConnection(conn net.Conn) {
 		return
 	}
 
-	var message block_chain.MainMessage
-	err = proto.Unmarshal(buf[:nRead], &message)
-	if err != nil {
-		log.Println(err)
+	var blockMessage block_chain.BlockMessage
+	err = proto.Unmarshal(buf[:nRead], &blockMessage)
+	if err == nil {
+		n.blockHandler.HandleBlockMessage(&blockMessage, conn)
 		return
 	}
 
-	switch msg := message.MessageType.(type) {
-	case *block_chain.MainMessage_BlockMessage:
-		n.blockHandler.HandleBlockMessage(msg.BlockMessage, conn)
-	case *block_chain.MainMessage_NodeMessage:
-		n.nodeHandler.HandleNodeMessage(msg.NodeMessage, conn)
+	var nodeMessage block_chain.NodeMessage
+	err = proto.Unmarshal(buf[:nRead], &nodeMessage)
+	if err == nil {
+		n.nodeHandler.HandleNodeMessage(&nodeMessage, conn)
+		return
 	}
+
+	log.Println("Failed to unmarshal message")
 }
 
 func (n *Node) getRandomNodes(count int) [][]byte {
@@ -110,9 +121,4 @@ func (n *Node) TryToFindNewBlock() {
 		n.blockchain.AddBlock(n.blockchain.root, newBlock)
 		time.Sleep(10 * time.Second)
 	}
-}
-
-// Implement BroadcastLatestBlock method
-func (n *Node) BroadcastLatestBlock() {
-	// Implementation here
 }

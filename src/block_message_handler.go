@@ -3,6 +3,7 @@ package src
 import (
 	"log"
 	"net"
+	"time"
 
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 	"google.golang.org/protobuf/proto"
@@ -53,7 +54,7 @@ func (h *BlockMessageHandlerImpl) handleBlockResponse(data []byte, address strin
 		return
 	}
 	block := BlockFromProto(blockResponse.GetBlock())
-	blockHash := block.calculateHash()
+	blockHash := block.CalculateHash()
 	if !h.blockchain.BlockExists(blockHash) {
 		h.GetBlock(address, block.PreviousHash)
 	} else {
@@ -89,7 +90,7 @@ func (h *BlockMessageHandlerImpl) SendBlock(address string, blockNode *BlockNode
 		Block:   protoBlock,
 	}
 
-	err = encodeMessage(conn, "BlockResponse", blockResponse)
+	err = EncodeMessage(conn, blockResponse)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -113,7 +114,7 @@ func (h *BlockMessageHandlerImpl) SendLatestBlock(address string) {
 		Block:   protoBlock,
 	}
 
-	err = encodeMessage(conn, "BlockResponse", blockResponse)
+	err = EncodeMessage(conn, blockResponse)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -131,7 +132,7 @@ func (h *BlockMessageHandlerImpl) GetBlock(address string, blockHash []byte) {
 		Hash: blockHash,
 	}
 
-	err = encodeMessage(conn, "GetBlock", getBlockRequest)
+	err = EncodeMessage(conn, getBlockRequest)
 	if err != nil {
 		log.Printf("Failed to encode message: %v", err)
 	}
@@ -146,8 +147,19 @@ func (h *BlockMessageHandlerImpl) GetLatestBlock(address string) {
 	defer conn.Close()
 
 	emptyMessage := &block_chain.Empty{}
-	err = encodeMessage(conn, "GetLatestBlock", emptyMessage)
+	err = EncodeMessage(conn, emptyMessage)
 	if err != nil {
 		log.Printf("Failed to encode message: %v", err)
+	}
+}
+
+func (h *BlockMessageHandlerImpl) BroadcastLatestBlock(nodes [][]byte) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		for _, node := range nodes {
+			h.GetLatestBlock(string(node))
+		}
 	}
 }

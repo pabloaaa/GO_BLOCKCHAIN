@@ -36,6 +36,9 @@ func (bc *Blockchain) createGenesisBlock() {
 		Childs: make([]*BlockNode, 0),
 	}
 }
+func (bc *Blockchain) GetRoot() *BlockNode {
+	return bc.root
+}
 func (bc *Blockchain) AddBlock(parent *BlockNode, block *Block) error {
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
@@ -68,11 +71,11 @@ func (bc *Blockchain) ValidateBlock(block *Block, parentBlock *Block) error {
 		return errors.New("Block index is not valid")
 	}
 
-	if !bytes.Equal(block.PreviousHash, parentBlock.calculateHash()) {
+	if !bytes.Equal(block.PreviousHash, parentBlock.CalculateHash()) {
 		return errors.New("Previous hash is not valid")
 	}
 
-	hashPrefix := block.calculateHash()[:3]
+	hashPrefix := block.CalculateHash()[:3]
 	if !bytes.Equal(hashPrefix, []byte("000")) {
 		return errors.New("Block hash is not valid")
 	}
@@ -121,7 +124,7 @@ func (bc *Blockchain) traverseTree(callback func(node *BlockNode) bool) {
 func (bc *Blockchain) GetBlock(hash []byte) *BlockNode {
 	var foundNode *BlockNode
 	bc.traverseTree(func(node *BlockNode) bool {
-		calculatedHash := node.Block.calculateHash()
+		calculatedHash := node.Block.CalculateHash()
 		if bytes.Equal(calculatedHash, hash) {
 			foundNode = node
 			return true
@@ -150,7 +153,7 @@ func (bc *Blockchain) GenerateNewBlock(transaction []Transaction) *Block {
 		Index:        latestBlock.Index + 1,
 		Timestamp:    uint64(time.Now().Unix()),
 		Transactions: transaction,
-		PreviousHash: latestBlock.calculateHash(),
+		PreviousHash: latestBlock.CalculateHash(),
 		Data:         0,
 	}
 	return newBlock
