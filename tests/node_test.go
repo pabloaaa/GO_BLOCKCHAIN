@@ -8,6 +8,7 @@ import (
 
 	pb "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 	. "github.com/pabloaaa/GO_BLOCKCHAIN/src"
+	"github.com/pabloaaa/GO_BLOCKCHAIN/types"
 )
 
 func startNode(node *Node, address string) {
@@ -46,13 +47,13 @@ func requestLatestBlock(node *Node, address string) {
 	}
 }
 
-func generateBlocks(num int) []*Block {
-	blocks := make([]*Block, num)
+func generateBlocks(num int) []*types.Block {
+	blocks := make([]*types.Block, num)
 	for i := 0; i < num; i++ {
-		block := &Block{
+		block := &types.Block{
 			Index:        uint64(i + 1), // Indeks zaczyna się od 1, ponieważ 0 to blok genesis
 			Timestamp:    uint64(time.Now().Unix()),
-			Transactions: make([]Transaction, 0),
+			Transactions: make([]types.Transaction, 0),
 			PreviousHash: []byte("0"),
 			Data:         uint64(i),
 		}

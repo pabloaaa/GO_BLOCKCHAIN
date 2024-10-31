@@ -1,11 +1,9 @@
 package interfaces
 
 import (
-	"net"
-
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 )
 
 type NodeMessageHandlerInterface interface {
-	HandleNodeMessage(msg *block_chain.NodeMessage, conn net.Conn)
+	HandleNodeMessage(msg *block_chain.NodeMessage)
 }

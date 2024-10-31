@@ -6,18 +6,18 @@ import (
 	"testing"
 
 	pb "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
-	. "github.com/pabloaaa/GO_BLOCKCHAIN/src"
+	"github.com/pabloaaa/GO_BLOCKCHAIN/types"
 )
 
-func setup() *Block {
-	transactions := []Transaction{
+func setup() *types.Block {
+	transactions := []types.Transaction{
 		{
 			Sender:   []byte("Alice"),
 			Receiver: []byte("Bob"),
 			Amount:   10.0,
 		},
 	}
-	return &Block{
+	return &types.Block{
 		Index:        1,
 		Timestamp:    123456789,
 		Transactions: transactions,
@@ -62,7 +62,7 @@ func TestBlockFromProto(t *testing.T) {
 		Data:       0,
 		Checkpoint: true,
 	}
-	block := BlockFromProto(pbBlock)
+	block := types.BlockFromProto(pbBlock)
 
 	if block.Index != pbBlock.GetIndex() {
 		t.Errorf("Expected %d, got %d", pbBlock.GetIndex(), block.Index)

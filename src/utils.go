@@ -1,17 +1,13 @@
 package src
 
 import (
-	"net"
-
 	"google.golang.org/protobuf/proto"
 )
 
-func EncodeMessage(conn net.Conn, message proto.Message) error {
+func EncodeMessage(message proto.Message) ([]byte, error) {
 	data, err := proto.Marshal(message)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	_, err = conn.Write(data)
-	return err
+	return data, nil
 }

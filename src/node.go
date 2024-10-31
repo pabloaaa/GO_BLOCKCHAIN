@@ -8,6 +8,7 @@ import (
 
 	"github.com/pabloaaa/GO_BLOCKCHAIN/interfaces"
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
+	"github.com/pabloaaa/GO_BLOCKCHAIN/types"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -17,23 +18,28 @@ type Message struct {
 }
 
 type Node struct {
-	blockchain   *Blockchain
-	nodes        [][]byte
-	blockHandler interfaces.BlockMessageHandlerInterface
-	nodeHandler  interfaces.NodeMessageHandlerInterface
+	blockchain       interfaces.BlockchainInterface
+	nodes            [][]byte
+	blockHandler     interfaces.BlockMessageHandlerInterface
+	nodeHandler      interfaces.NodeMessageHandlerInterface
+	tcpMessageSender interfaces.MessageSender
+	address          string
 }
 
-func NewNode(blockchain *Blockchain) *Node {
+func NewNode(blockchain interfaces.BlockchainInterface, address string) *Node {
+	messageSender, _ := NewTCPSender(address)
 	node := &Node{
-		blockchain: blockchain,
-		nodes:      make([][]byte, 0),
+		blockchain:       blockchain,
+		nodes:            make([][]byte, 0),
+		tcpMessageSender: messageSender,
+		address:          address,
 	}
-	node.blockHandler = NewBlockMessageHandler(blockchain)
+	node.blockHandler = NewBlockMessageHandler(blockchain, node.tcpMessageSender)
 	node.nodeHandler = NewNodeMessageHandler(node)
 	return node
 }
 
-func (n *Node) GetBlockchain() *Blockchain {
+func (n *Node) GetBlockchain() interfaces.BlockchainInterface {
 	return n.blockchain
 }
 
@@ -41,14 +47,22 @@ func (n *Node) GetNodes() [][]byte {
 	return n.nodes
 }
 
-func (n *Node) Start(address []byte) {
-	ln, err := net.Listen("tcp", string(address))
+func (n *Node) GetAddress() string {
+	return n.address
+}
+
+func (n *Node) GetMessageSender() interfaces.MessageSender {
+	return n.tcpMessageSender
+}
+
+func (n *Node) Start() {
+	ln, err := net.Listen("tcp", n.address)
 	if err != nil {
-		log.Fatalf("Failed to listen on address %s: %v", address, err)
+		log.Fatalf("Failed to listen on address %s: %v", n.address, err)
 	}
 	defer ln.Close()
 
-	n.BroadcastAddress(address)
+	n.BroadcastAddress([]byte(n.address))
 	go n.TryToFindNewBlock()
 
 	go n.blockHandler.BroadcastLatestBlock(n.nodes) // Implement this method
@@ -75,14 +89,14 @@ func (n *Node) handleConnection(conn net.Conn) {
 	var blockMessage block_chain.BlockMessage
 	err = proto.Unmarshal(buf[:nRead], &blockMessage)
 	if err == nil {
-		n.blockHandler.HandleBlockMessage(&blockMessage, conn)
+		n.blockHandler.HandleBlockMessage(&blockMessage)
 		return
 	}
 
 	var nodeMessage block_chain.NodeMessage
 	err = proto.Unmarshal(buf[:nRead], &nodeMessage)
 	if err == nil {
-		n.nodeHandler.HandleNodeMessage(&nodeMessage, conn)
+		n.nodeHandler.HandleNodeMessage(&nodeMessage)
 		return
 	}
 
@@ -103,7 +117,7 @@ func (n *Node) getRandomNodes(count int) [][]byte {
 
 func (n *Node) TryToFindNewBlock() {
 	for {
-		transaction := []Transaction{
+		transaction := []types.Transaction{
 			{Sender: []byte("Alice"), Receiver: []byte("Bob"), Amount: 10},
 		}
 		newBlock := n.blockchain.GenerateNewBlock(transaction)
@@ -118,7 +132,7 @@ func (n *Node) TryToFindNewBlock() {
 			nonce++
 		}
 
-		n.blockchain.AddBlock(n.blockchain.root, newBlock)
+		n.blockchain.AddBlock(n.blockchain.GetRoot(), newBlock)
 		time.Sleep(10 * time.Second)
 	}
 }

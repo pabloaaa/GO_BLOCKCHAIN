@@ -6,6 +6,7 @@ import (
 	"time"
 
 	. "github.com/pabloaaa/GO_BLOCKCHAIN/src"
+	"github.com/pabloaaa/GO_BLOCKCHAIN/types"
 )
 
 func setupBlockchain() *Blockchain {
@@ -25,11 +26,11 @@ func TestNewBlockchain(t *testing.T) {
 	}
 }
 
-func generateHardcodedValidBlock(parent *Block) *Block {
-	newBlock := &Block{
+func generateHardcodedValidBlock(parent *types.Block) *types.Block {
+	newBlock := &types.Block{
 		Index:        parent.Index + 1,
 		Timestamp:    uint64(time.Now().Unix()),
-		Transactions: make([]Transaction, 0),
+		Transactions: make([]types.Transaction, 0),
 		PreviousHash: parent.CalculateHash(),
 		Data:         0,
 	}
@@ -75,10 +76,10 @@ func TestValidateBlock(t *testing.T) {
 		t.Errorf("Expected block to be valid, but got error: %v", err)
 	}
 
-	invalidBlock := &Block{
+	invalidBlock := &types.Block{
 		Index:        2,
 		Timestamp:    uint64(time.Now().Unix()),
-		Transactions: make([]Transaction, 0),
+		Transactions: make([]types.Transaction, 0),
 		PreviousHash: genesisBlock.CalculateHash(),
 		Data:         0,
 	}
