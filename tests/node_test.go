@@ -12,7 +12,7 @@ import (
 )
 
 func startNode(node *Node, address string) {
-	go node.Start([]byte(address))
+	go node.Start()
 	time.Sleep(1 * time.Second)
 }
 
@@ -27,7 +27,12 @@ func sendWelcomeRequest(node *Node, address string) {
 		Message: []byte(address),
 	}
 
-	err = EncodeMessage(conn, welcomeRequest)
+	data, err := EncodeMessage(welcomeRequest)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = conn.Write(data)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,8 +45,13 @@ func requestLatestBlock(node *Node, address string) {
 	}
 	defer conn.Close()
 
-	emptyMessage := &pb.GetLatestBlockRequest{}
-	err = EncodeMessage(conn, emptyMessage)
+	latestBlockRequest := &pb.GetLatestBlockRequest{}
+	data, err := EncodeMessage(latestBlockRequest)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = conn.Write(data)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -67,8 +77,9 @@ func generateBlocks(num int) []*types.Block {
 
 func TestNewNode(t *testing.T) {
 	blockchain := NewBlockchain()
+	address := "127.0.0.1:8080"
 
-	node := NewNode(blockchain)
+	node := NewNode(blockchain, address)
 
 	if node.GetBlockchain() != blockchain {
 		t.Errorf("Expected blockchain to be %v, but got %v", blockchain, node.GetBlockchain())
@@ -82,15 +93,13 @@ func TestNewNode(t *testing.T) {
 func TestNodeStart(t *testing.T) {
 	// Tworzymy nowy blockchain
 	blockchain := NewBlockchain()
-
-	// Tworzymy nowy węzeł
-	node := NewNode(blockchain)
-
-	// Adres, na którym serwer będzie nasłuchiwał
 	address := "127.0.0.1:8080"
 
+	// Tworzymy nowy węzeł
+	node := NewNode(blockchain, address)
+
 	// Uruchamiamy serwer w osobnej gorutynie
-	go node.Start([]byte(address))
+	go node.Start()
 
 	// Czekamy chwilę, aby serwer się uruchomił
 	time.Sleep(1 * time.Second)
@@ -122,12 +131,10 @@ func TestNodeSync(t *testing.T) {
 	}
 
 	// Tworzymy dwa nody
-	node1 := NewNode(blockchain1)
-	node2 := NewNode(blockchain2)
-
-	// Adresy, na których serwery będą nasłuchiwać
 	address1 := "127.0.0.1:8081"
 	address2 := "127.0.0.1:8082"
+	node1 := NewNode(blockchain1, address1)
+	node2 := NewNode(blockchain2, address2)
 
 	// Uruchamiamy serwery w osobnych gorutynach
 	startNode(node1, address1)
