@@ -6,7 +6,6 @@ import (
 	"github.com/pabloaaa/GO_BLOCKCHAIN/interfaces"
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 	"github.com/pabloaaa/GO_BLOCKCHAIN/types"
-	"google.golang.org/protobuf/proto"
 )
 
 type BlockMessageHandlerImpl struct {
@@ -18,27 +17,63 @@ func NewBlockMessageHandler(blockchain interfaces.BlockchainInterface, messageSe
 	return &BlockMessageHandlerImpl{blockchain: blockchain, messageSender: messageSender}
 }
 
-func (h *BlockMessageHandlerImpl) HandleBlockMessage(msg *block_chain.BlockMessage) {
-	switch blockMsg := msg.BlockMessageType.(type) {
-	case *block_chain.BlockMessage_GetLatestBlockRequest:
-		h.handleGetLatestBlock(nil)
-	case *block_chain.BlockMessage_GetBlockRequest_:
-		h.handleGetBlockRequest(blockMsg.GetBlockRequest_.Hash)
-	case *block_chain.BlockMessage_BlockResponse:
-		h.handleBlockResponse(blockMsg.BlockResponse.Message)
-	}
+func (h *BlockMessageHandlerImpl) handleRequest(msg *block_chain.BlockMessage) (*block_chain.BlockMessage, error) {
+
+  // ideally that should loook more like
+
+  switch blockMsg := msg.BlockMessageType.(type) {
+    case *block_chain.BlockMessage_GetLatestBlockRequest:
+      return h.handleGetLatestBlock(blockMsg.GetLatestBlockRequest) // 
+    case *block_chain.BlockMessage_GetBlockRequest_:
+      h.handleGetBlockRequest(blockMsg.GetBlockRequest_.Hash)
+      return nil, nil
+    case *block_chain.BlockMessage_BlockResponse: {
+      h.handleBlockResponse(blockMsg.BlockResponse)
+      return nil, nil
+    }
+  }
+  return nil, nil
 }
 
-func (h *BlockMessageHandlerImpl) handleGetLatestBlock(data []byte) {
-	if data != nil {
-		getLatestBlockRequest := &block_chain.GetLatestBlockRequest{}
-		err := proto.Unmarshal(data, getLatestBlockRequest)
-		if err != nil {
-			log.Println(err)
-			return
-		}
+
+func (h *BlockMessageHandlerImpl) HandleBlockMessage(msg *block_chain.BlockMessage) {
+
+
+  // hangle request and get response to send back
+  response, err := h.handleRequest(msg)
+  if err != nil {
+    log.Println("Failed to handle request: %v", err)
+  }
+
+  // encode and send happens only in this single place instead of being called in every message handler
+	data, err := EncodeMessage(response)
+  if err != nil {
+    log.Println("Failed to encode message: %v", err)
+  }
+	err = h.messageSender.SendMsg(data)
+}
+
+// providing return type for handler fn has  nubmer of benefits:
+// - you can not forget to send the message, you need to return sth and then its send in HanleBlockMessage
+// - compiler forces you to provide return value
+// - function has single responsibility - handling message and returning response
+func (h *BlockMessageHandlerImpl) handleGetLatestBlock(req *block_chain.GetLatestBlockRequest) (*block_chain.BlockMessage, error) {
+
+	latestBlock := h.blockchain.GetLatestBlock()
+	protoBlock := latestBlock.ToProto()
+	blockResponse := &block_chain.BlockResponse{
+		Success: true,
+		Message: []byte("Latest block"),
+		Block:   protoBlock,
 	}
-	h.SendLatestBlock()
+
+	blockMessage := &block_chain.BlockMessage{
+		BlockMessageType: &block_chain.BlockMessage_BlockResponse{
+			BlockResponse: blockResponse,
+		},
+	}
+
+	return blockMessage, nil
 }
 
 func (h *BlockMessageHandlerImpl) handleGetBlockRequest(hash []byte) {
@@ -49,35 +84,39 @@ func (h *BlockMessageHandlerImpl) handleGetBlockRequest(hash []byte) {
 	}
 }
 
-func (h *BlockMessageHandlerImpl) handleBlockResponse(data []byte) {
-	blockResponse := &block_chain.BlockResponse{}
-	err := proto.Unmarshal(data, blockResponse)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+// Hanlde block response should handle blockResponse type not bytes, 
+// functioon should only have 1 responsibility, originally this function do:
+// - deserialize proto message (and handle failures)
+// - handling the message ang generate response
+// - serialize the response
+// - send the response
+//
+func (h *BlockMessageHandlerImpl) handleBlockResponse(blockResponse *block_chain.BlockResponse) {
 	block := types.BlockFromProto(blockResponse.GetBlock())
-	blockHash := block.CalculateHash()
-	if !h.blockchain.BlockExists(blockHash) {
+	if !h.blockchain.BlockExists(blockResponse.Block.Hash) {
 		h.GetBlock(block.PreviousHash)
 	} else {
-		parent := h.blockchain.GetBlock(block.PreviousHash)
-		if parent != nil {
-			// Validate the block before adding it to the blockchain
-			err := h.blockchain.ValidateBlock(block, parent.Block)
-			if err != nil {
-				log.Println("Received invalid block: ", err)
-			} else {
-				err := h.blockchain.AddBlock(parent, block)
-				if err != nil {
-					log.Println(err)
-				} else {
-					// Send a success message
-					h.SendBlock(parent)
-				}
-			}
+    // prefer to use early return
+    parent := h.blockchain.GetBlock(block.PreviousHash)
+    if parent == nil {
+      return
+    }
+    // Validate the block before adding it to the blockchain
+    err := h.blockchain.ValidateBlock(block, parent.Block)
+    if err != nil {
+      log.Println("Received invalid block: ", err)
+      return;
+    } 
+
+    err = h.blockchain.AddBlock(parent, block)
+    if err != nil {
+      log.Println(err)
+      return
+    }
+
+    // this is clearly bad, as handling blockResponse returns another block response ????
+    h.SendBlock(parent)
 		}
-	}
 }
 
 func (h *BlockMessageHandlerImpl) SendBlock(blockNode *types.BlockNode) {
