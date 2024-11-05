@@ -12,4 +12,5 @@ type BlockchainInterface interface {
 	BlockExists(hash []byte) bool
 	GenerateNewBlock(transaction []types.Transaction) *types.Block
 	GetRoot() *types.BlockNode
+	TraverseTree(callback func(node *types.BlockNode) bool)
 }

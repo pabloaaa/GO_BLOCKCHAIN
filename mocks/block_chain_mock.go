@@ -45,5 +45,9 @@ func (m *MockBlockchain) GetRoot() *types.BlockNode {
 	return args.Get(0).(*types.BlockNode)
 }
 
+func (m *MockBlockchain) TraverseTree(callback func(node *types.BlockNode) bool) {
+	m.Called(callback)
+}
+
 // Ensure MockBlockchain implements BlockchainInterface
 var _ interfaces.BlockchainInterface = (*MockBlockchain)(nil)

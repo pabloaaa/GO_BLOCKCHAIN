@@ -65,7 +65,7 @@ func (n *Node) Start() {
 	n.BroadcastAddress([]byte(n.address))
 	go n.TryToFindNewBlock()
 
-	go n.blockHandler.BroadcastLatestBlock(n.nodes) // Implement this method
+	go n.BroadcastLatestBlock()
 
 	for {
 		conn, err := ln.Accept()
@@ -134,5 +134,22 @@ func (n *Node) TryToFindNewBlock() {
 
 		n.blockchain.AddBlock(n.blockchain.GetRoot(), newBlock)
 		time.Sleep(10 * time.Second)
+	}
+}
+
+func (n *Node) traverseTree(callback func(node *types.BlockNode) bool) {
+	n.blockchain.TraverseTree(callback)
+}
+
+func (n *Node) BroadcastLatestBlock() {
+	randomNodes := n.getRandomNodes(5)
+	for _, node := range randomNodes {
+		messageSender, err := NewTCPSender(string(node))
+		if err != nil {
+			log.Printf("Failed to connect to node: %v", err)
+			continue
+		}
+		blockHandler := NewBlockMessageHandler(n.blockchain, messageSender)
+		blockHandler.GetLatestBlock()
 	}
 }

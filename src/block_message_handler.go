@@ -6,7 +6,6 @@ import (
 	"github.com/pabloaaa/GO_BLOCKCHAIN/interfaces"
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 	"github.com/pabloaaa/GO_BLOCKCHAIN/types"
-	"google.golang.org/protobuf/proto"
 )
 
 type BlockMessageHandlerImpl struct {
@@ -19,65 +18,89 @@ func NewBlockMessageHandler(blockchain interfaces.BlockchainInterface, messageSe
 }
 
 func (h *BlockMessageHandlerImpl) HandleBlockMessage(msg *block_chain.BlockMessage) {
-	switch blockMsg := msg.BlockMessageType.(type) {
-	case *block_chain.BlockMessage_GetLatestBlockRequest:
-		h.handleGetLatestBlock(nil)
-	case *block_chain.BlockMessage_GetBlockRequest_:
-		h.handleGetBlockRequest(blockMsg.GetBlockRequest_.Hash)
-	case *block_chain.BlockMessage_BlockResponse:
-		h.handleBlockResponse(blockMsg.BlockResponse.Message)
+	response, err := h.HandleRequest(msg)
+	if err != nil {
+		log.Println("Error handling block message:", err)
+		return
 	}
-}
-
-func (h *BlockMessageHandlerImpl) handleGetLatestBlock(data []byte) {
-	if data != nil {
-		getLatestBlockRequest := &block_chain.GetLatestBlockRequest{}
-		err := proto.Unmarshal(data, getLatestBlockRequest)
+	if response != nil {
+		data, err := EncodeMessage(response)
 		if err != nil {
-			log.Println(err)
+			log.Println("Failed to encode response message:", err)
 			return
 		}
+		err = h.messageSender.SendMsg(data)
+		if err != nil {
+			log.Println("Failed to send response message:", err)
+		}
 	}
-	h.SendLatestBlock()
 }
 
-func (h *BlockMessageHandlerImpl) handleGetBlockRequest(hash []byte) {
+func (h *BlockMessageHandlerImpl) HandleRequest(msg *block_chain.BlockMessage) (*block_chain.BlockMessage, error) {
+	switch blockMsg := msg.BlockMessageType.(type) {
+	case *block_chain.BlockMessage_GetLatestBlockRequest:
+		return h.handleGetLatestBlock(blockMsg.GetLatestBlockRequest)
+	case *block_chain.BlockMessage_GetBlockRequest_:
+		return h.handleGetBlockRequest(blockMsg.GetBlockRequest_.Hash)
+	case *block_chain.BlockMessage_BlockResponse:
+		return h.handleBlockResponse(blockMsg.BlockResponse)
+	}
+	return nil, nil
+}
+
+func (h *BlockMessageHandlerImpl) handleGetLatestBlock(request *block_chain.GetLatestBlockRequest) (*block_chain.BlockMessage, error) {
+	latestBlock := h.blockchain.GetLatestBlock()
+	protoBlock := latestBlock.ToProto()
+	blockResponse := &block_chain.BlockResponse{
+		Success: true,
+		Message: []byte("Latest block"),
+		Block:   protoBlock,
+	}
+
+	blockMessage := &block_chain.BlockMessage{
+		BlockMessageType: &block_chain.BlockMessage_BlockResponse{
+			BlockResponse: blockResponse,
+		},
+	}
+	return blockMessage, nil
+}
+
+func (h *BlockMessageHandlerImpl) handleGetBlockRequest(hash []byte) (*block_chain.BlockMessage, error) {
 	getBlockRequest := &block_chain.GetBlockRequest{Hash: hash}
 	block := h.blockchain.GetBlock(getBlockRequest.GetHash())
 	if block != nil {
 		h.SendBlock(block)
 	}
+	return nil, nil
 }
 
-func (h *BlockMessageHandlerImpl) handleBlockResponse(data []byte) {
-	blockResponse := &block_chain.BlockResponse{}
-	err := proto.Unmarshal(data, blockResponse)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+func (h *BlockMessageHandlerImpl) handleBlockResponse(blockResponse *block_chain.BlockResponse) (*block_chain.BlockMessage, error) {
 	block := types.BlockFromProto(blockResponse.GetBlock())
 	blockHash := block.CalculateHash()
 	if !h.blockchain.BlockExists(blockHash) {
 		h.GetBlock(block.PreviousHash)
-	} else {
-		parent := h.blockchain.GetBlock(block.PreviousHash)
-		if parent != nil {
-			// Validate the block before adding it to the blockchain
-			err := h.blockchain.ValidateBlock(block, parent.Block)
-			if err != nil {
-				log.Println("Received invalid block: ", err)
-			} else {
-				err := h.blockchain.AddBlock(parent, block)
-				if err != nil {
-					log.Println(err)
-				} else {
-					// Send a success message
-					h.SendBlock(parent)
-				}
-			}
-		}
+		return nil, nil
 	}
+
+	parent := h.blockchain.GetBlock(block.PreviousHash)
+	if parent == nil {
+		return nil, nil
+	}
+
+	// Validate the block before adding it to the blockchain
+	err := h.blockchain.ValidateBlock(block, parent.Block)
+	if err != nil {
+		log.Println("Received invalid block: ", err)
+		return nil, nil
+	}
+
+	err = h.blockchain.AddBlock(parent, block)
+	if err != nil {
+		log.Println(err)
+		return nil, nil
+	}
+
+	return nil, nil
 }
 
 func (h *BlockMessageHandlerImpl) SendBlock(blockNode *types.BlockNode) {
@@ -86,28 +109,6 @@ func (h *BlockMessageHandlerImpl) SendBlock(blockNode *types.BlockNode) {
 	blockResponse := &block_chain.BlockResponse{
 		Success: true,
 		Message: []byte("Block"),
-		Block:   protoBlock,
-	}
-
-	data, err := EncodeMessage(blockResponse)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = h.messageSender.SendMsg(data)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func (h *BlockMessageHandlerImpl) SendLatestBlock() {
-	latestBlock := h.blockchain.GetLatestBlock()
-
-	protoBlock := latestBlock.ToProto()
-
-	blockResponse := &block_chain.BlockResponse{
-		Success: true,
-		Message: []byte("Latest block"),
 		Block:   protoBlock,
 	}
 
@@ -140,8 +141,8 @@ func (h *BlockMessageHandlerImpl) GetBlock(blockHash []byte) {
 }
 
 func (h *BlockMessageHandlerImpl) GetLatestBlock() {
-	emptyMessage := &block_chain.Empty{}
-	data, err := EncodeMessage(emptyMessage)
+	getLatestBlockRequest := &block_chain.GetLatestBlockRequest{}
+	data, err := EncodeMessage(getLatestBlockRequest)
 	if err != nil {
 		log.Printf("Failed to encode message: %v", err)
 		return
@@ -151,15 +152,4 @@ func (h *BlockMessageHandlerImpl) GetLatestBlock() {
 	if err != nil {
 		log.Printf("Failed to send message: %v", err)
 	}
-}
-
-func (h *BlockMessageHandlerImpl) BroadcastLatestBlock(nodes [][]byte) {
-	// ticker := time.NewTicker(5 * time.Second)
-	// defer ticker.Stop()
-
-	// for range ticker.C {
-	// 	for _, node := range nodes {
-	// 		h.GetLatestBlock()
-	// 	}
-	// }
 }

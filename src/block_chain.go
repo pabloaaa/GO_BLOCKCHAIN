@@ -101,7 +101,7 @@ func (bc *Blockchain) ReplaceBlocks(blocks []*types.Block) {
 func (bc *Blockchain) BlockExists(hash []byte) bool {
 	return bc.GetBlock(hash) != nil
 }
-func (bc *Blockchain) traverseTree(callback func(node *types.BlockNode) bool) {
+func (bc *Blockchain) TraverseTree(callback func(node *types.BlockNode) bool) {
 	var queue []*types.BlockNode
 
 	queue = append(queue, bc.root)
@@ -121,7 +121,7 @@ func (bc *Blockchain) traverseTree(callback func(node *types.BlockNode) bool) {
 }
 func (bc *Blockchain) GetBlock(hash []byte) *types.BlockNode {
 	var foundNode *types.BlockNode
-	bc.traverseTree(func(node *types.BlockNode) bool {
+	bc.TraverseTree(func(node *types.BlockNode) bool {
 		calculatedHash := node.Block.CalculateHash()
 		if bytes.Equal(calculatedHash, hash) {
 			foundNode = node
@@ -133,7 +133,7 @@ func (bc *Blockchain) GetBlock(hash []byte) *types.BlockNode {
 }
 func (bc *Blockchain) GetLatestBlock() *types.Block {
 	var longestPath []*types.BlockNode
-	bc.traverseTree(func(node *types.BlockNode) bool {
+	bc.TraverseTree(func(node *types.BlockNode) bool {
 		if len(node.Childs) > len(longestPath) {
 			longestPath = node.Childs
 		}
