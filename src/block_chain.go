@@ -10,16 +10,20 @@ import (
 	"github.com/pabloaaa/GO_BLOCKCHAIN/types"
 )
 
+// Blockchain represents the blockchain.
 type Blockchain struct {
 	root *types.BlockNode
 	mux  sync.Mutex
 }
 
+// NewBlockchain creates a new Blockchain.
 func NewBlockchain() *Blockchain {
 	blockchain := &Blockchain{}
 	blockchain.createGenesisBlock()
 	return blockchain
 }
+
+// createGenesisBlock creates the genesis block.
 func (bc *Blockchain) createGenesisBlock() {
 	genesisBlock := &types.Block{
 		Index:        0,
@@ -34,9 +38,13 @@ func (bc *Blockchain) createGenesisBlock() {
 		Childs: make([]*types.BlockNode, 0),
 	}
 }
+
+// GetRoot returns the root block node.
 func (bc *Blockchain) GetRoot() *types.BlockNode {
 	return bc.root
 }
+
+// AddBlock adds a new block to the blockchain.
 func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) error {
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
@@ -59,11 +67,14 @@ func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) erro
 	return nil
 }
 
+// ApproveBlock sets the checkpoint flag for the block if it meets the criteria.
 func (bc *Blockchain) ApproveBlock(blockNode *types.BlockNode) {
 	if blockNode.Block.Index%10 == 0 {
 		blockNode.Block.Checkpoint = true
 	}
 }
+
+// ValidateBlock validates a block against its parent block.
 func (bc *Blockchain) ValidateBlock(block *types.Block, parentBlock *types.Block) error {
 	if block.Index != parentBlock.Index+1 {
 		return errors.New("Block index is not valid")
@@ -80,6 +91,8 @@ func (bc *Blockchain) ValidateBlock(block *types.Block, parentBlock *types.Block
 
 	return nil
 }
+
+// convertToBlockNodes converts a slice of blocks to a slice of block nodes.
 func (bc *Blockchain) convertToBlockNodes(blocks []*types.Block) []*types.BlockNode {
 	blockNodes := make([]*types.BlockNode, len(blocks))
 	for i, block := range blocks {
@@ -91,6 +104,8 @@ func (bc *Blockchain) convertToBlockNodes(blocks []*types.Block) []*types.BlockN
 	}
 	return blockNodes
 }
+
+// ReplaceBlocks replaces the current blocks with new blocks.
 func (bc *Blockchain) ReplaceBlocks(blocks []*types.Block) {
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
@@ -98,9 +113,13 @@ func (bc *Blockchain) ReplaceBlocks(blocks []*types.Block) {
 	blockNodes := bc.convertToBlockNodes(blocks)
 	bc.root = blockNodes[0] // Assuming the first block is the root
 }
+
+// BlockExists checks if a block exists in the blockchain.
 func (bc *Blockchain) BlockExists(hash []byte) bool {
 	return bc.GetBlock(hash) != nil
 }
+
+// traverseTree traverses the blockchain tree and applies a callback function to each node.
 func (bc *Blockchain) traverseTree(callback func(node *types.BlockNode) bool) {
 	var queue []*types.BlockNode
 
@@ -119,6 +138,8 @@ func (bc *Blockchain) traverseTree(callback func(node *types.BlockNode) bool) {
 		}
 	}
 }
+
+// GetBlock returns a block node by its hash.
 func (bc *Blockchain) GetBlock(hash []byte) *types.BlockNode {
 	var foundNode *types.BlockNode
 	bc.traverseTree(func(node *types.BlockNode) bool {
@@ -131,6 +152,8 @@ func (bc *Blockchain) GetBlock(hash []byte) *types.BlockNode {
 	})
 	return foundNode
 }
+
+// GetLatestBlock returns the latest block in the blockchain.
 func (bc *Blockchain) GetLatestBlock() *types.Block {
 	var longestPath []*types.BlockNode
 	bc.traverseTree(func(node *types.BlockNode) bool {
@@ -145,6 +168,7 @@ func (bc *Blockchain) GetLatestBlock() *types.Block {
 	return longestPath[len(longestPath)-1].Block
 }
 
+// GenerateNewBlock generates a new block with the given transactions.
 func (bc *Blockchain) GenerateNewBlock(transaction []types.Transaction) *types.Block {
 	latestBlock := bc.GetLatestBlock()
 	newBlock := &types.Block{

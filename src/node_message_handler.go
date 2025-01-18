@@ -8,14 +8,17 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// NodeMessageHandlerImpl handles node-related messages.
 type NodeMessageHandlerImpl struct {
 	node *Node
 }
 
+// NewNodeMessageHandler creates a new NodeMessageHandlerImpl.
 func NewNodeMessageHandler(node *Node) *NodeMessageHandlerImpl {
 	return &NodeMessageHandlerImpl{node: node}
 }
 
+// HandleNodeMessage processes incoming node messages.
 func (h *NodeMessageHandlerImpl) HandleNodeMessage(msg *block_chain.NodeMessage) {
 	switch nodeMsg := msg.NodeMessageType.(type) {
 	case *block_chain.NodeMessage_WelcomeRequest:
@@ -25,6 +28,7 @@ func (h *NodeMessageHandlerImpl) HandleNodeMessage(msg *block_chain.NodeMessage)
 	}
 }
 
+// handleWelcomeRequest processes a welcome request message.
 func (n *Node) handleWelcomeRequest(data []byte) {
 	welcomeRequest := &block_chain.WelcomeRequest{}
 	err := proto.Unmarshal(data, welcomeRequest)
@@ -36,6 +40,7 @@ func (n *Node) handleWelcomeRequest(data []byte) {
 	n.SendAddressWelcomeResponse()
 }
 
+// handleWelcomeResponse processes a welcome response message.
 func (n *Node) handleWelcomeResponse(data []byte) {
 	welcomeResponse := &block_chain.WelcomeResponse{}
 	err := proto.Unmarshal(data, welcomeResponse)
@@ -46,6 +51,7 @@ func (n *Node) handleWelcomeResponse(data []byte) {
 	n.AddNodes(welcomeResponse.Message)
 }
 
+// BroadcastAddress sends the node's address to all known nodes.
 func (n *Node) BroadcastAddress(address []byte) {
 	for _, node := range n.nodes {
 		welcomeRequest := &block_chain.WelcomeRequest{
@@ -70,6 +76,7 @@ func (n *Node) BroadcastAddress(address []byte) {
 	}
 }
 
+// SendAddressWelcomeResponse sends a welcome response with the node's address.
 func (n *Node) SendAddressWelcomeResponse() {
 	nodes := bytes.Join(n.nodes, []byte(", "))
 
@@ -94,6 +101,7 @@ func (n *Node) SendAddressWelcomeResponse() {
 	}
 }
 
+// AddNodes adds a new node address to the list of known nodes.
 func (n *Node) AddNodes(address []byte) {
 	for _, node := range n.nodes {
 		if bytes.Equal(node, address) {

@@ -8,6 +8,7 @@ import (
 	pb "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 )
 
+// Block represents a single block in the blockchain.
 type Block struct {
 	Index        uint64
 	Timestamp    uint64
@@ -17,18 +18,21 @@ type Block struct {
 	Checkpoint   bool
 }
 
+// BlockNode represents a node in the blockchain tree.
 type BlockNode struct {
 	Block  *Block
 	Parent *BlockNode
 	Childs []*BlockNode
 }
 
+// Transaction represents a transaction in the blockchain.
 type Transaction struct {
 	Sender   []byte
 	Receiver []byte
 	Amount   float64
 }
 
+// CalculateHash calculates the SHA-256 hash of the block.
 func (b *Block) CalculateHash() []byte {
 	var transactionsStrings []string
 	for _, t := range b.Transactions {
@@ -39,10 +43,7 @@ func (b *Block) CalculateHash() []byte {
 	return hash[:]
 }
 
-func (b *Block) SetData(nonce uint64) {
-	b.Data = nonce
-}
-
+// BlockFromProto converts a protobuf Block to a Block.
 func BlockFromProto(pbBlock *pb.Block) *Block {
 	transactions := make([]Transaction, len(pbBlock.GetTransactions()))
 	for i, pbTransaction := range pbBlock.GetTransactions() {
@@ -63,6 +64,7 @@ func BlockFromProto(pbBlock *pb.Block) *Block {
 	}
 }
 
+// ToProto converts a Block to a protobuf Block.
 func (b *Block) ToProto() *pb.Block {
 	pbTransactions := make([]*pb.Transaction, len(b.Transactions))
 	for i, transaction := range b.Transactions {

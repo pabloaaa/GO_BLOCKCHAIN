@@ -37,15 +37,6 @@ func TestCalculateHash(t *testing.T) {
 	}
 }
 
-func TestSetData(t *testing.T) {
-	block := setup()
-	block.SetData(42)
-
-	if block.Data != 42 {
-		t.Errorf("Expected block data to be 42, but got %d", block.Data)
-	}
-}
-
 func TestBlockFromProto(t *testing.T) {
 	pbBlock := &pb.Block{
 		Index:        1,

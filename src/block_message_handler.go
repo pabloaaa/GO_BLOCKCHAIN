@@ -9,15 +9,18 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// BlockMessageHandlerImpl handles block-related messages.
 type BlockMessageHandlerImpl struct {
 	blockchain    interfaces.BlockchainInterface
 	messageSender interfaces.MessageSender
 }
 
+// NewBlockMessageHandler creates a new BlockMessageHandlerImpl.
 func NewBlockMessageHandler(blockchain interfaces.BlockchainInterface, messageSender interfaces.MessageSender) *BlockMessageHandlerImpl {
 	return &BlockMessageHandlerImpl{blockchain: blockchain, messageSender: messageSender}
 }
 
+// HandleBlockMessage processes incoming block messages.
 func (h *BlockMessageHandlerImpl) HandleBlockMessage(msg *block_chain.BlockMessage) {
 	switch blockMsg := msg.BlockMessageType.(type) {
 	case *block_chain.BlockMessage_GetLatestBlockRequest:
@@ -29,6 +32,7 @@ func (h *BlockMessageHandlerImpl) HandleBlockMessage(msg *block_chain.BlockMessa
 	}
 }
 
+// handleGetLatestBlock processes a request for the latest block.
 func (h *BlockMessageHandlerImpl) handleGetLatestBlock(data []byte) {
 	if data != nil {
 		getLatestBlockRequest := &block_chain.GetLatestBlockRequest{}
@@ -41,6 +45,7 @@ func (h *BlockMessageHandlerImpl) handleGetLatestBlock(data []byte) {
 	h.SendLatestBlock()
 }
 
+// handleGetBlockRequest processes a request for a specific block.
 func (h *BlockMessageHandlerImpl) handleGetBlockRequest(hash []byte) {
 	getBlockRequest := &block_chain.GetBlockRequest{Hash: hash}
 	block := h.blockchain.GetBlock(getBlockRequest.GetHash())
@@ -49,6 +54,7 @@ func (h *BlockMessageHandlerImpl) handleGetBlockRequest(hash []byte) {
 	}
 }
 
+// handleBlockResponse processes a block response message.
 func (h *BlockMessageHandlerImpl) handleBlockResponse(data []byte) {
 	blockResponse := &block_chain.BlockResponse{}
 	err := proto.Unmarshal(data, blockResponse)
@@ -80,6 +86,7 @@ func (h *BlockMessageHandlerImpl) handleBlockResponse(data []byte) {
 	}
 }
 
+// SendBlock sends a block to the message sender.
 func (h *BlockMessageHandlerImpl) SendBlock(blockNode *types.BlockNode) {
 	protoBlock := blockNode.Block.ToProto()
 
@@ -100,6 +107,7 @@ func (h *BlockMessageHandlerImpl) SendBlock(blockNode *types.BlockNode) {
 	}
 }
 
+// SendLatestBlock sends the latest block to the message sender.
 func (h *BlockMessageHandlerImpl) SendLatestBlock() {
 	latestBlock := h.blockchain.GetLatestBlock()
 
@@ -122,6 +130,7 @@ func (h *BlockMessageHandlerImpl) SendLatestBlock() {
 	}
 }
 
+// GetBlock requests a block by its hash.
 func (h *BlockMessageHandlerImpl) GetBlock(blockHash []byte) {
 	getBlockRequest := &block_chain.GetBlockRequest{
 		Hash: blockHash,
@@ -139,6 +148,7 @@ func (h *BlockMessageHandlerImpl) GetBlock(blockHash []byte) {
 	}
 }
 
+// GetLatestBlock requests the latest block.
 func (h *BlockMessageHandlerImpl) GetLatestBlock() {
 	emptyMessage := &block_chain.Empty{}
 	data, err := EncodeMessage(emptyMessage)
@@ -153,6 +163,7 @@ func (h *BlockMessageHandlerImpl) GetLatestBlock() {
 	}
 }
 
+// BroadcastLatestBlock broadcasts the latest block to all nodes.
 func (h *BlockMessageHandlerImpl) BroadcastLatestBlock(nodes [][]byte) {
 	// ticker := time.NewTicker(5 * time.Second)
 	// defer ticker.Stop()

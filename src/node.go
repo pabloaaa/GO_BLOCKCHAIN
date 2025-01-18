@@ -124,7 +124,7 @@ func (n *Node) TryToFindNewBlock() {
 		nonce := uint64(0)
 
 		for {
-			newBlock.SetData(nonce)
+			newBlock.Data = nonce
 			parentBlock := n.blockchain.GetLatestBlock()
 			if err := n.blockchain.ValidateBlock(newBlock, parentBlock); err == nil {
 				break
