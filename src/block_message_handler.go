@@ -24,10 +24,13 @@ func NewBlockMessageHandler(blockchain interfaces.BlockchainInterface, messageSe
 func (h *BlockMessageHandlerImpl) HandleBlockMessage(msg *block_chain.BlockMessage) {
 	switch blockMsg := msg.BlockMessageType.(type) {
 	case *block_chain.BlockMessage_GetLatestBlockRequest:
+		log.Println("Handling GetLatestBlockRequest")
 		h.handleGetLatestBlock(nil)
 	case *block_chain.BlockMessage_GetBlockRequest_:
+		log.Println("Handling GetBlockRequest")
 		h.handleGetBlockRequest(blockMsg.GetBlockRequest_.Hash)
 	case *block_chain.BlockMessage_BlockResponse:
+		log.Println("Handling BlockResponse")
 		h.handleBlockResponse(blockMsg.BlockResponse.Message)
 	}
 }
@@ -110,6 +113,7 @@ func (h *BlockMessageHandlerImpl) SendBlock(blockNode *types.BlockNode) {
 // SendLatestBlock sends the latest block to the message sender.
 func (h *BlockMessageHandlerImpl) SendLatestBlock() {
 	latestBlock := h.blockchain.GetLatestBlock()
+	log.Printf("Sending latest block with index: %d", latestBlock.Index)
 
 	protoBlock := latestBlock.ToProto()
 

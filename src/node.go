@@ -4,7 +4,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"time"
+	"sync"
 
 	"github.com/pabloaaa/GO_BLOCKCHAIN/interfaces"
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
@@ -24,6 +24,7 @@ type Node struct {
 	nodeHandler      interfaces.NodeMessageHandlerInterface
 	tcpMessageSender interfaces.MessageSender
 	address          string
+	mux              sync.Mutex // Add a mutex to the Node struct
 }
 
 func NewNode(blockchain interfaces.BlockchainInterface, address string) *Node {
@@ -63,7 +64,6 @@ func (n *Node) Start() {
 	defer ln.Close()
 
 	n.BroadcastAddress([]byte(n.address))
-	go n.TryToFindNewBlock()
 
 	go n.blockHandler.BroadcastLatestBlock(n.nodes) // Implement this method
 
@@ -89,6 +89,7 @@ func (n *Node) handleConnection(conn net.Conn) {
 	var blockMessage block_chain.BlockMessage
 	err = proto.Unmarshal(buf[:nRead], &blockMessage)
 	if err == nil {
+		log.Println("Received block message")
 		n.blockHandler.HandleBlockMessage(&blockMessage)
 		return
 	}
@@ -96,6 +97,7 @@ func (n *Node) handleConnection(conn net.Conn) {
 	var nodeMessage block_chain.NodeMessage
 	err = proto.Unmarshal(buf[:nRead], &nodeMessage)
 	if err == nil {
+		log.Println("Received node message")
 		n.nodeHandler.HandleNodeMessage(&nodeMessage)
 		return
 	}
@@ -116,23 +118,52 @@ func (n *Node) getRandomNodes(count int) [][]byte {
 }
 
 func (n *Node) TryToFindNewBlock() {
-	for {
-		transaction := []types.Transaction{
-			{Sender: []byte("Alice"), Receiver: []byte("Bob"), Amount: 10},
-		}
-		newBlock := n.blockchain.GenerateNewBlock(transaction)
-		nonce := uint64(0)
+	log.Println("Starting to find a new block...")
 
-		for {
-			newBlock.Data = nonce
-			parentBlock := n.blockchain.GetLatestBlock()
-			if err := n.blockchain.ValidateBlock(newBlock, parentBlock); err == nil {
-				break
-			}
-			nonce++
-		}
+	n.mux.Lock() // Lock the mutex before generating the new block
 
-		n.blockchain.AddBlock(n.blockchain.GetRoot(), newBlock)
-		time.Sleep(10 * time.Second)
+	// Get the latest approved block or the latest block if no approved block exists
+	parentBlock := n.blockchain.GetLatestBlock()
+	log.Printf("Latest block index: %d", parentBlock.Index)
+
+	// Generate a new block with the correct index
+	transaction := []types.Transaction{
+		{Sender: []byte("Alice"), Receiver: []byte("Bob"), Amount: 10},
 	}
+	newBlock := n.blockchain.GenerateNewBlock(transaction)
+	newBlock.Index = parentBlock.Index + 1
+	newBlock.PreviousHash = parentBlock.CalculateHash()
+
+	// Validate the new block
+	nonce := uint64(0)
+	for {
+		newBlock.Data = nonce
+		if err := n.blockchain.ValidateBlock(newBlock, parentBlock); err == nil {
+			break
+		}
+		nonce++
+	}
+
+	// Add the new block to the blockchain
+	latestBlockNode := n.blockchain.GetBlock(parentBlock.CalculateHash())
+	if latestBlockNode == nil {
+		log.Printf("Failed to find the latest block node")
+		n.mux.Unlock()
+		return
+	}
+
+	err := n.blockchain.AddBlock(latestBlockNode, newBlock)
+	if err != nil {
+		log.Printf("Failed to add block: %v", err)
+		n.mux.Unlock()
+		return
+	} else {
+		log.Printf("Added new block: %v", newBlock)
+		// Broadcast the new block to other nodes if it has a checkpoint
+		if newBlock.Checkpoint {
+			n.blockHandler.BroadcastLatestBlock(n.nodes)
+		}
+	}
+
+	n.mux.Unlock() // Unlock the mutex after adding the block
 }
