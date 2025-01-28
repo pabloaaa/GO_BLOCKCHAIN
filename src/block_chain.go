@@ -84,6 +84,7 @@ func (bc *Blockchain) ApproveBlock(blockNode *types.BlockNode) {
 	if blockNode.Block.Index%10 == 0 {
 		blockNode.Block.Checkpoint = true
 	}
+	blockNode.Block.Checkpoint = false
 }
 
 // ValidateBlock validates a block against its parent block.
@@ -124,6 +125,7 @@ func (bc *Blockchain) ReplaceBlocks(blocks []*types.Block) {
 
 	blockNodes := bc.convertToBlockNodes(blocks)
 	bc.root = blockNodes[0] // Assuming the first block is the root
+	log.Println("Blockchain replaced with new blocks")
 }
 
 // BlockExists checks if a block exists in the blockchain.

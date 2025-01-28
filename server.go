@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"html/template"
+	"log"
 	"net"
 	"net/http"
 
@@ -18,27 +18,24 @@ func main() {
 	// Inicjalizacja blockchaina
 	blockchain := src.NewBlockchain()
 
-	// Pobierz port z argumentów lub użyj domyślnego
-	port := flag.String("port", "8082", "port to listen on")
+	// Pobierz port z argumentów
+	port := flag.String("port", "0", "port to listen on")
 	flag.Parse()
 
-	// Sprawdź, czy port jest już zajęty
+	// Sprawdź, czy port jest już zajęty lub ustawiony na 0
 	ln, err := net.Listen("tcp", ":"+*port)
-	if err != nil {
-		// Jeśli port jest zajęty, użyj losowego dostępnego portu
+	if err != nil || *port == "0" {
+		// Jeśli port jest zajęty lub ustawiony na 0, użyj losowego dostępnego portu
 		ln, err = net.Listen("tcp", ":0")
 		if err != nil {
 			fmt.Printf("Failed to find an available port: %v\n", err)
 			return
 		}
 		*port = fmt.Sprintf("%d", ln.Addr().(*net.TCPAddr).Port)
-		ln.Close()
 	}
+	ln.Close()
 
 	fmt.Printf("Starting server on port %s\n", *port) // Debugowanie
-
-	// Inicjalizacja noda
-	node = src.NewNode(blockchain, ":"+*port)
 
 	// Inicjalizacja routera Gin
 	router := gin.Default()
@@ -50,9 +47,6 @@ func main() {
 		go node.TryToFindNewBlock()
 		c.JSON(http.StatusOK, gin.H{"status": "Finding new block started"})
 	})
-
-	// Uruchomienie serwera HTTP
-	go node.Start()
 
 	// Uruchomienie serwera HTTP i wypisanie rzeczywistego portu
 	server := &http.Server{
@@ -67,6 +61,11 @@ func main() {
 	}
 	fmt.Printf("Server is listening on port %d\n", ln.Addr().(*net.TCPAddr).Port)
 
+	// Inicjalizacja noda
+	node = src.NewNode(blockchain, "localhost:"+*port)
+
+	go node.Start()
+
 	if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
 		fmt.Printf("Failed to serve: %v\n", err)
 	}
@@ -80,13 +79,21 @@ func syncNodes(c *gin.Context) {
 		return
 	}
 
-	// Wywołaj metodę requestLatestBlock, aby zsynchronizować bloki
-	node.GetMessageSender().SendMsg([]byte(fmt.Sprintf("http://%s/latestblock", otherNodeAddress)))
+	log.Printf("Starting synchronization with node: %s", otherNodeAddress)
+
+	err := node.SyncNodes(otherNodeAddress)
+	if err != nil {
+		log.Printf("Failed to synchronize nodes: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to synchronize nodes"})
+		return
+	}
+
+	log.Printf("Synchronization with node %s complete", otherNodeAddress)
 
 	c.JSON(http.StatusOK, gin.H{"message": "synchronization complete"})
 }
 
-// getStatus zwraca obecny stan blockchaina jako raport HTML
+// getStatus zwraca obecny stan blockchaina jako HTML
 func getStatus(c *gin.Context) {
 	var blocks []*types.Block
 	node.GetBlockchain().TraverseTree(func(node *types.BlockNode) bool {
@@ -94,45 +101,13 @@ func getStatus(c *gin.Context) {
 		return false
 	})
 
-	tmpl := `
-	<!DOCTYPE html>
-	<html>
-	<head>
-		<title>Blockchain Status</title>
-	</head>
-	<body>
-		<h1>Blockchain Status</h1>
-		<ul>
-			{{range .}}
-			<li>
-				<p>Index: {{.Index}}</p>
-				<p>Timestamp: {{.Timestamp}}</p>
-				<p>Previous Hash: {{.PreviousHash}}</p>
-				<p>Hash: {{.CalculateHash}}</p>
-				<p>Transactions:</p>
-				<ul>
-					{{range .Transactions}}
-					<li>Sender: {{.Sender}}, Receiver: {{.Receiver}}, Amount: {{.Amount}}</li>
-					{{end}}
-				</ul>
-				<p>Data: {{.Data}}</p>
-				<p>Checkpoint: {{.Checkpoint}}</p>
-			</li>
-			{{end}}
-		</ul>
-	</body>
-	</html>
-	`
-
-	t, err := template.New("status").Parse(tmpl)
-	if err != nil {
-		c.String(http.StatusInternalServerError, "Error parsing template: %v", err)
-		return
+	html := "<html><head><title>Blockchain Status</title></head><body><h1>Blockchain Status</h1><ul>"
+	for _, block := range blocks {
+		hash := block.CalculateHash()
+		html += fmt.Sprintf("<li>Index: %d, Timestamp: %d, Previous Hash: %x, Hash: %x, Transactions: %v, Data: %d, Checkpoint: %t</li>",
+			block.Index, block.Timestamp, block.PreviousHash, hash, block.Transactions, block.Data, block.Checkpoint)
 	}
+	html += "</ul></body></html>"
 
-	c.Header("Content-Type", "text/html")
-	err = t.Execute(c.Writer, blocks)
-	if err != nil {
-		c.String(http.StatusInternalServerError, "Error executing template: %v", err)
-	}
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 }

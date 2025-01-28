@@ -95,6 +95,7 @@ message TransactionPoolResponse {
 message LatestBlockResponse {
   Block block = 1;
 }
+
 message BlockUpdateRequest{
   Block block = 1;
 }

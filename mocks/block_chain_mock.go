@@ -58,5 +58,9 @@ func (m *MockBlockchain) GetBlockByIndex(index uint64) *types.BlockNode {
 	return args.Get(0).(*types.BlockNode)
 }
 
+func (m *MockBlockchain) ReplaceBlocks(blocks []*types.Block) {
+	m.Called(blocks)
+}
+
 // Ensure MockBlockchain implements BlockchainInterface
 var _ interfaces.BlockchainInterface = (*MockBlockchain)(nil)

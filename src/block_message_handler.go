@@ -32,6 +32,9 @@ func (h *BlockMessageHandlerImpl) HandleBlockMessage(msg *block_chain.BlockMessa
 	case *block_chain.BlockMessage_BlockResponse:
 		log.Println("Handling BlockResponse")
 		h.handleBlockResponse(blockMsg.BlockResponse.Message)
+	case *block_chain.BlockMessage_LatestBlockResponse:
+		log.Println("Handling LatestBlockResponse")
+		h.handleLatestBlockResponse(blockMsg.LatestBlockResponse.Block)
 	}
 }
 
@@ -89,6 +92,18 @@ func (h *BlockMessageHandlerImpl) handleBlockResponse(data []byte) {
 	}
 }
 
+// handleLatestBlockResponse processes a latest block response message.
+func (h *BlockMessageHandlerImpl) handleLatestBlockResponse(protoBlock *block_chain.Block) {
+	block := types.BlockFromProto(protoBlock)
+	blockHash := block.CalculateHash()
+	if !h.blockchain.BlockExists(blockHash) {
+		h.blockchain.ReplaceBlocks([]*types.Block{block})
+		log.Println("Blockchain synchronized with the latest block")
+	} else {
+		log.Println("Received block already exists in the blockchain")
+	}
+}
+
 // SendBlock sends a block to the message sender.
 func (h *BlockMessageHandlerImpl) SendBlock(blockNode *types.BlockNode) {
 	protoBlock := blockNode.Block.ToProto()
@@ -99,7 +114,7 @@ func (h *BlockMessageHandlerImpl) SendBlock(blockNode *types.BlockNode) {
 		Block:   protoBlock,
 	}
 
-	data, err := EncodeMessage(blockResponse)
+	data, err := proto.Marshal(blockResponse)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -123,7 +138,7 @@ func (h *BlockMessageHandlerImpl) SendLatestBlock() {
 		Block:   protoBlock,
 	}
 
-	data, err := EncodeMessage(blockResponse)
+	data, err := proto.Marshal(blockResponse)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -140,7 +155,7 @@ func (h *BlockMessageHandlerImpl) GetBlock(blockHash []byte) {
 		Hash: blockHash,
 	}
 
-	data, err := EncodeMessage(getBlockRequest)
+	data, err := proto.Marshal(getBlockRequest)
 	if err != nil {
 		log.Printf("Failed to encode message: %v", err)
 		return
@@ -154,8 +169,8 @@ func (h *BlockMessageHandlerImpl) GetBlock(blockHash []byte) {
 
 // GetLatestBlock requests the latest block.
 func (h *BlockMessageHandlerImpl) GetLatestBlock() {
-	emptyMessage := &block_chain.Empty{}
-	data, err := EncodeMessage(emptyMessage)
+	getLatestBlockRequest := &block_chain.GetLatestBlockRequest{}
+	data, err := proto.Marshal(getLatestBlockRequest)
 	if err != nil {
 		log.Printf("Failed to encode message: %v", err)
 		return

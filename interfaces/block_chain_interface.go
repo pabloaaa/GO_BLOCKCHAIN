@@ -14,4 +14,5 @@ type BlockchainInterface interface {
 	GetRoot() *types.BlockNode
 	TraverseTree(callback func(node *types.BlockNode) bool)
 	GetBlockByIndex(index uint64) *types.BlockNode
+	ReplaceBlocks(blocks []*types.Block)
 }

@@ -1,6 +1,7 @@
 package src
 
 import (
+	"fmt"
 	"log"
 	"math/rand"
 	"net"
@@ -28,7 +29,28 @@ type Node struct {
 }
 
 func NewNode(blockchain interfaces.BlockchainInterface, address string) *Node {
-	messageSender, _ := NewTCPSender(address)
+	log.Printf("Initializing node with address: %s", address)
+
+	// Check if the address contains a port
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		log.Fatalf("Invalid address format: %v", err)
+	}
+
+	// If the port is 0, find an available port
+	if port == "0" {
+		ln, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
+		if err != nil {
+			log.Fatalf("Failed to find an available port: %v", err)
+		}
+		defer ln.Close()
+		address = ln.Addr().String()
+	}
+
+	messageSender, err := NewTCPSender(address)
+	if err != nil {
+		log.Fatalf("Failed to create TCP message sender: %v", err)
+	}
 	node := &Node{
 		blockchain:       blockchain,
 		nodes:            make([][]byte, 0),
@@ -57,6 +79,8 @@ func (n *Node) GetMessageSender() interfaces.MessageSender {
 }
 
 func (n *Node) Start() {
+	log.Printf("Node starting on address: %s", n.address)
+
 	ln, err := net.Listen("tcp", n.address)
 	if err != nil {
 		log.Fatalf("Failed to listen on address %s: %v", n.address, err)
@@ -166,4 +190,44 @@ func (n *Node) TryToFindNewBlock() {
 	}
 
 	n.mux.Unlock() // Unlock the mutex after adding the block
+}
+
+func (n *Node) SyncNodes(address string) error {
+	log.Printf("Synchronizing with node at address: %s", address)
+
+	// Create a GetLatestBlockRequest message
+	getLatestBlockRequest := &block_chain.GetLatestBlockRequest{}
+	data, err := proto.Marshal(getLatestBlockRequest)
+	if err != nil {
+		return fmt.Errorf("failed to marshal GetLatestBlockRequest: %v", err)
+	}
+
+	// Send the message to the other node
+	err = n.tcpMessageSender.SendMsg(data)
+	if err != nil {
+		return fmt.Errorf("failed to send message: %v", err)
+	}
+
+	// Wait for the response and update the blockchain
+	// This part should be handled in the message handler
+
+	// Simulate receiving the latest blocks from the other node
+	// In a real implementation, this would involve network communication
+	latestBlocks := []*types.Block{
+		// Add blocks received from the other node
+	}
+
+	// Add the received blocks to the blockchain
+	for _, block := range latestBlocks {
+		parentBlock := n.blockchain.GetBlock(block.PreviousHash)
+		if parentBlock == nil {
+			return fmt.Errorf("failed to find parent block for block with index %d", block.Index)
+		}
+		err := n.blockchain.AddBlock(parentBlock, block)
+		if err != nil {
+			return fmt.Errorf("failed to add block with index %d: %v", block.Index, err)
+		}
+	}
+
+	return nil
 }
