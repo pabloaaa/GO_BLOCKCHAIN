@@ -2,7 +2,9 @@ package src
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"log"
 	"sync"
 	"time"
@@ -26,13 +28,23 @@ func NewBlockchain() *Blockchain {
 
 // createGenesisBlock creates the genesis block.
 func (bc *Blockchain) createGenesisBlock() {
-	genesisBlock := &types.Block{
-		Index:        0,
-		Timestamp:    uint64(time.Now().Unix()),
-		Transactions: make([]types.Transaction, 0),
-		PreviousHash: []byte("0"),
-		Data:         0,
+	// Odczytaj plik konfiguracyjny
+	configData, err := ioutil.ReadFile("/Users/pawelnowakowski/go_projects/src/GO_BLOCKCHAIN/config.json")
+	if err != nil {
+		log.Fatalf("Failed to read config file: %v", err)
 	}
+
+	// Zdekoduj dane genesis block
+	var config struct {
+		GenesisBlock types.Block `json:"genesis_block"`
+	}
+	err = json.Unmarshal(configData, &config)
+	if err != nil {
+		log.Fatalf("Failed to unmarshal config data: %v", err)
+	}
+
+	// Utwórz genesis block na podstawie danych z pliku konfiguracyjnego
+	genesisBlock := &config.GenesisBlock
 	bc.root = &types.BlockNode{
 		Block:  genesisBlock,
 		Parent: nil,
@@ -125,7 +137,6 @@ func (bc *Blockchain) ReplaceBlocks(blocks []*types.Block) {
 
 	blockNodes := bc.convertToBlockNodes(blocks)
 	bc.root = blockNodes[0] // Assuming the first block is the root
-	log.Println("Blockchain replaced with new blocks")
 }
 
 // BlockExists checks if a block exists in the blockchain.
@@ -138,7 +149,6 @@ func (bc *Blockchain) TraverseTree(callback func(node *types.BlockNode) bool) {
 	var queue []*types.BlockNode
 
 	queue = append(queue, bc.root)
-
 	for len(queue) > 0 {
 		node := queue[0]
 		queue = queue[1:]

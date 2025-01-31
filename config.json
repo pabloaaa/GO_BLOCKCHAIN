@@ -1,0 +1,9 @@
+{
+    "genesis_block": {
+      "index": 0,
+      "timestamp": 1638316800,
+      "transactions": [],
+      "previous_hash": "0",
+      "data": 0
+    }
+  }

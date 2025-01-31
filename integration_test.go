@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -56,7 +57,19 @@ func TestNodeSynchronization(t *testing.T) {
 	defer killProcessesOnPort("49991")
 
 	// Start the first node on port 49990
-	cmd1 := exec.Command("go", "run", "server.go", "-port", "49990")
+	cmd1 := exec.Command("go", "run", "server.go", "-port", "49990", "-messageSenderAddress", "localhost:50000")
+	stdout1, _ := cmd1.StdoutPipe()
+	stderr1, _ := cmd1.StderrPipe()
+	r1, w1 := io.Pipe()
+	go func() {
+		io.Copy(w1, stdout1)
+	}()
+	go func() {
+		io.Copy(w1, stderr1)
+	}()
+	go func() {
+		io.Copy(t.LogWriter(), r1)
+	}()
 	err := cmd1.Start()
 	assert.NoError(t, err)
 	defer cmd1.Process.Kill()
@@ -71,7 +84,19 @@ func TestNodeSynchronization(t *testing.T) {
 	}
 
 	// Start the second node on port 49991
-	cmd2 := exec.Command("go", "run", "server.go", "-port", "49991")
+	cmd2 := exec.Command("go", "run", "server.go", "-port", "49991", "-messageSenderAddress", "localhost:50000")
+	stdout2, _ := cmd2.StdoutPipe()
+	stderr2, _ := cmd2.StderrPipe()
+	r2, w2 := io.Pipe()
+	go func() {
+		io.Copy(w2, stdout2)
+	}()
+	go func() {
+		io.Copy(w2, stderr2)
+	}()
+	go func() {
+		io.Copy(t.LogWriter(), r2)
+	}()
 	err = cmd2.Start()
 	assert.NoError(t, err)
 	defer cmd2.Process.Kill()

@@ -4,8 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pabloaaa/GO_BLOCKCHAIN/src"
@@ -14,28 +14,27 @@ import (
 
 var node *src.Node
 
+func init() {
+	log.SetOutput(os.Stdout)
+}
+
 func main() {
 	// Inicjalizacja blockchaina
 	blockchain := src.NewBlockchain()
 
 	// Pobierz port z argumentów
-	port := flag.String("port", "0", "port to listen on")
+	port := flag.String("port", "50001", "port to listen on")
+	httpPort := flag.String("httpPort", "60001", "HTTP port to listen on")
 	flag.Parse()
 
-	// Sprawdź, czy port jest już zajęty lub ustawiony na 0
-	ln, err := net.Listen("tcp", ":"+*port)
-	if err != nil || *port == "0" {
-		// Jeśli port jest zajęty lub ustawiony na 0, użyj losowego dostępnego portu
-		ln, err = net.Listen("tcp", ":0")
-		if err != nil {
-			fmt.Printf("Failed to find an available port: %v\n", err)
-			return
-		}
-		*port = fmt.Sprintf("%d", ln.Addr().(*net.TCPAddr).Port)
-	}
-	ln.Close()
+	// Inicjalizacja tcpMessageSender
+	tcpMessageSender := src.NewTCPSender()
 
-	fmt.Printf("Starting server on port %s\n", *port) // Debugowanie
+	// Inicjalizacja noda
+	node = src.NewNode(blockchain, "localhost:"+*port, tcpMessageSender)
+
+	// Start TCP server
+	go node.Start()
 
 	// Inicjalizacja routera Gin
 	router := gin.Default()
@@ -48,26 +47,10 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "Finding new block started"})
 	})
 
-	// Uruchomienie serwera HTTP i wypisanie rzeczywistego portu
-	server := &http.Server{
-		Addr:    ":" + *port,
-		Handler: router,
-	}
-
-	ln, err = net.Listen("tcp", server.Addr)
-	if err != nil {
-		fmt.Printf("Failed to start server: %v\n", err)
-		return
-	}
-	fmt.Printf("Server is listening on port %d\n", ln.Addr().(*net.TCPAddr).Port)
-
-	// Inicjalizacja noda
-	node = src.NewNode(blockchain, "localhost:"+*port)
-
-	go node.Start()
-
-	if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
-		fmt.Printf("Failed to serve: %v\n", err)
+	// Uruchomienie serwera HTTP
+	log.Printf("HTTP server started on %s", *httpPort)
+	if err := router.Run(":" + *httpPort); err != nil {
+		log.Fatalf("Failed to start HTTP server: %v", err)
 	}
 }
 
@@ -79,7 +62,7 @@ func syncNodes(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Starting synchronization with node: %s", otherNodeAddress)
+	log.Printf("Starting synchronization with node: %s from node: %s", otherNodeAddress, node.GetAddress())
 
 	err := node.SyncNodes(otherNodeAddress)
 	if err != nil {

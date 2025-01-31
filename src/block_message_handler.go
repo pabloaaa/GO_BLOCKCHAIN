@@ -2,17 +2,18 @@ package src
 
 import (
 	"log"
+	"sort"
 
 	"github.com/pabloaaa/GO_BLOCKCHAIN/interfaces"
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 	"github.com/pabloaaa/GO_BLOCKCHAIN/types"
-	"google.golang.org/protobuf/proto"
 )
 
 // BlockMessageHandlerImpl handles block-related messages.
 type BlockMessageHandlerImpl struct {
 	blockchain    interfaces.BlockchainInterface
 	messageSender interfaces.MessageSender
+	senderAddress string
 }
 
 // NewBlockMessageHandler creates a new BlockMessageHandlerImpl.
@@ -20,176 +21,102 @@ func NewBlockMessageHandler(blockchain interfaces.BlockchainInterface, messageSe
 	return &BlockMessageHandlerImpl{blockchain: blockchain, messageSender: messageSender}
 }
 
+// SetSenderAddress sets the sender address.
+func (h *BlockMessageHandlerImpl) SetSenderAddress(address string) {
+	h.senderAddress = address
+}
+
 // HandleBlockMessage processes incoming block messages.
 func (h *BlockMessageHandlerImpl) HandleBlockMessage(msg *block_chain.BlockMessage) {
+	log.Printf("Handling block message of type: %T from node: %s with payload: %v", msg.BlockMessageType, h.blockchain.GetLatestBlock().PreviousHash, msg)
 	switch blockMsg := msg.BlockMessageType.(type) {
-	case *block_chain.BlockMessage_GetLatestBlockRequest:
-		log.Println("Handling GetLatestBlockRequest")
-		h.handleGetLatestBlock(nil)
-	case *block_chain.BlockMessage_GetBlockRequest_:
-		log.Println("Handling GetBlockRequest")
-		h.handleGetBlockRequest(blockMsg.GetBlockRequest_.Hash)
-	case *block_chain.BlockMessage_BlockResponse:
-		log.Println("Handling BlockResponse")
-		h.handleBlockResponse(blockMsg.BlockResponse.Message)
-	case *block_chain.BlockMessage_LatestBlockResponse:
-		log.Println("Handling LatestBlockResponse")
-		h.handleLatestBlockResponse(blockMsg.LatestBlockResponse.Block)
+	case *block_chain.BlockMessage_BlockchainSyncRequest:
+		log.Println("Handling BlockchainSyncRequest")
+		h.handleBlockchainSyncRequest(blockMsg.BlockchainSyncRequest.Hash, blockMsg.BlockchainSyncRequest.SenderAddress)
+	case *block_chain.BlockMessage_BlocksResponse:
+		log.Println("Handling BlocksRespone")
+		h.handleBlocksResponse(blockMsg.BlocksResponse.Blocks)
 	}
 }
 
-// handleGetLatestBlock processes a request for the latest block.
-func (h *BlockMessageHandlerImpl) handleGetLatestBlock(data []byte) {
-	if data != nil {
-		getLatestBlockRequest := &block_chain.GetLatestBlockRequest{}
-		err := proto.Unmarshal(data, getLatestBlockRequest)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-	}
-	h.SendLatestBlock()
-}
+func (h *BlockMessageHandlerImpl) handleBlockchainSyncRequest(hash []byte, senderAddress string) {
+	h.senderAddress = senderAddress
+	log.Printf("Adres nadawcy: %s", senderAddress) // Dodane logowanie adresu nadawcy
 
-// handleGetBlockRequest processes a request for a specific block.
-func (h *BlockMessageHandlerImpl) handleGetBlockRequest(hash []byte) {
-	getBlockRequest := &block_chain.GetBlockRequest{Hash: hash}
-	block := h.blockchain.GetBlock(getBlockRequest.GetHash())
-	if block != nil {
-		h.SendBlock(block)
-	}
-}
-
-// handleBlockResponse processes a block response message.
-func (h *BlockMessageHandlerImpl) handleBlockResponse(data []byte) {
-	blockResponse := &block_chain.BlockResponse{}
-	err := proto.Unmarshal(data, blockResponse)
-	if err != nil {
-		log.Println(err)
+	blockNode := h.blockchain.GetBlock(hash)
+	if blockNode == nil {
+		log.Printf("Block with hash %x not found", hash)
 		return
 	}
-	block := types.BlockFromProto(blockResponse.GetBlock())
-	blockHash := block.CalculateHash()
-	if !h.blockchain.BlockExists(blockHash) {
-		h.GetBlock(block.PreviousHash)
+
+	var blocks []*types.Block
+	h.blockchain.TraverseTree(func(node *types.BlockNode) bool {
+		if node.Block.Index > blockNode.Block.Index {
+			blocks = append(blocks, node.Block)
+		}
+		return false
+	})
+
+	protoBlocks := make([]*block_chain.Block, len(blocks))
+	for i, block := range blocks {
+		protoBlocks[i] = block.ToProto()
+	}
+
+	blocksResponse := &block_chain.BlocksResponse{
+		Blocks: protoBlocks,
+	}
+
+	mainMessage := &block_chain.MainMessage{
+		MessageType: &block_chain.MainMessage_BlockMessage{
+			BlockMessage: &block_chain.BlockMessage{
+				BlockMessageType: &block_chain.BlockMessage_BlocksResponse{
+					BlocksResponse: blocksResponse,
+				},
+			},
+		},
+	}
+
+	data, err := EncodeMessage(mainMessage)
+	if err != nil {
+		log.Printf("Failed to encode BlocksResponse: %v", err)
+		return
+	}
+
+	err = h.messageSender.SendMsgToAddress(h.senderAddress, data)
+	if err != nil {
+		log.Printf("Failed to send BlocksResponse: %v", err)
 	} else {
+		log.Println("Successfully sent BlocksResponse")
+	}
+}
+
+// handleBlocksResponse processes blocks response message.
+func (h *BlockMessageHandlerImpl) handleBlocksResponse(protoBlocks []*block_chain.Block) {
+	log.Println("Handling BlocksResponse")
+
+	// Konwertuj proto bloki na typy bloków
+	blocks := make([]*types.Block, len(protoBlocks))
+	for i, protoBlock := range protoBlocks {
+		blocks[i] = types.BlockFromProto(protoBlock)
+	}
+
+	// Sortuj bloki według indeksów
+	sort.Slice(blocks, func(i, j int) bool {
+		return blocks[i].Index < blocks[j].Index
+	})
+
+	// Dodaj bloki do blockchaina
+	for _, block := range blocks {
 		parent := h.blockchain.GetBlock(block.PreviousHash)
 		if parent != nil {
-			// Validate the block before adding it to the blockchain
-			err := h.blockchain.ValidateBlock(block, parent.Block)
+			err := h.blockchain.AddBlock(parent, block)
 			if err != nil {
-				log.Println("Received invalid block: ", err)
+				log.Printf("Failed to add block with index %d: %v", block.Index, err)
 			} else {
-				err := h.blockchain.AddBlock(parent, block)
-				if err != nil {
-					log.Println(err)
-				} else {
-					// Send a success message
-					h.SendBlock(parent)
-				}
+				log.Printf("Successfully added block with index %d", block.Index)
 			}
+		} else {
+			log.Printf("Parent block not found for block with index %d", block.Index)
 		}
 	}
-}
-
-// handleLatestBlockResponse processes a latest block response message.
-func (h *BlockMessageHandlerImpl) handleLatestBlockResponse(protoBlock *block_chain.Block) {
-	block := types.BlockFromProto(protoBlock)
-	blockHash := block.CalculateHash()
-	if !h.blockchain.BlockExists(blockHash) {
-		h.blockchain.ReplaceBlocks([]*types.Block{block})
-		log.Println("Blockchain synchronized with the latest block")
-	} else {
-		log.Println("Received block already exists in the blockchain")
-	}
-}
-
-// SendBlock sends a block to the message sender.
-func (h *BlockMessageHandlerImpl) SendBlock(blockNode *types.BlockNode) {
-	protoBlock := blockNode.Block.ToProto()
-
-	blockResponse := &block_chain.BlockResponse{
-		Success: true,
-		Message: []byte("Block"),
-		Block:   protoBlock,
-	}
-
-	data, err := proto.Marshal(blockResponse)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = h.messageSender.SendMsg(data)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-// SendLatestBlock sends the latest block to the message sender.
-func (h *BlockMessageHandlerImpl) SendLatestBlock() {
-	latestBlock := h.blockchain.GetLatestBlock()
-	log.Printf("Sending latest block with index: %d", latestBlock.Index)
-
-	protoBlock := latestBlock.ToProto()
-
-	blockResponse := &block_chain.BlockResponse{
-		Success: true,
-		Message: []byte("Latest block"),
-		Block:   protoBlock,
-	}
-
-	data, err := proto.Marshal(blockResponse)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = h.messageSender.SendMsg(data)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-// GetBlock requests a block by its hash.
-func (h *BlockMessageHandlerImpl) GetBlock(blockHash []byte) {
-	getBlockRequest := &block_chain.GetBlockRequest{
-		Hash: blockHash,
-	}
-
-	data, err := proto.Marshal(getBlockRequest)
-	if err != nil {
-		log.Printf("Failed to encode message: %v", err)
-		return
-	}
-
-	err = h.messageSender.SendMsg(data)
-	if err != nil {
-		log.Printf("Failed to send message: %v", err)
-	}
-}
-
-// GetLatestBlock requests the latest block.
-func (h *BlockMessageHandlerImpl) GetLatestBlock() {
-	getLatestBlockRequest := &block_chain.GetLatestBlockRequest{}
-	data, err := proto.Marshal(getLatestBlockRequest)
-	if err != nil {
-		log.Printf("Failed to encode message: %v", err)
-		return
-	}
-
-	err = h.messageSender.SendMsg(data)
-	if err != nil {
-		log.Printf("Failed to send message: %v", err)
-	}
-}
-
-// BroadcastLatestBlock broadcasts the latest block to all nodes.
-func (h *BlockMessageHandlerImpl) BroadcastLatestBlock(nodes [][]byte) {
-	// ticker := time.NewTicker(5 * time.Second)
-	// defer ticker.Stop()
-
-	// for range ticker.C {
-	// 	for _, node := range nodes {
-	// 		h.GetLatestBlock()
-	// 	}
-	// }
 }

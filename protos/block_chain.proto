@@ -15,17 +15,11 @@ message MainMessage {
 // Block-related messages
 message BlockMessage {
   oneof block_message_type {
-    BlockRequest block_request = 1;
-    BlockResponse block_response = 2;
-    BlockchainResponse blockchain_response = 3;
-    BlocksResponse blocks_response = 4;
-    TransactionPoolResponse transaction_pool_response = 5;
-    LatestBlockResponse latest_block_response = 6;
-    BlockUpdateRequest block_update_request = 7;
-    BlockUpdateResponse block_update_response = 8;
-    GetLatestBlockRequest get_latest_block_request = 9;
-    GetBlockRequest get_block_request = 10;
-    Empty empty = 11;
+    BlockResponse block_response = 1;
+    BlocksResponse blocks_response = 2;
+    BlockchainSyncRequest blockchain_sync_request = 3;
+    GetLatestBlockRequest get_latest_block_request = 4;
+    Empty empty = 5;
   }
 }
 
@@ -57,14 +51,6 @@ message PongResponse {
 /********************************  NODE MESSAGES */
 
 /******************************** BLOCK MESSAGES */
-message BlockRequest {
-  Block block = 1;
-}
-message BlockResponse {
-  bool success = 1;
-  bytes message = 2;
-  Block block = 3;
-}
 message Empty {}
 
 message Block {
@@ -82,33 +68,23 @@ message Transaction {
   double amount = 3;
 }
 
-message BlockchainResponse {
-  repeated Block blocks = 1;
+message BlockResponse {
+  bool success = 1;
+  bytes message = 2;
+  Block block = 3;
 }
+
 message BlocksResponse {
   repeated Block blocks = 1;
 }
-message TransactionPoolResponse {
-  repeated Transaction transactions = 1;
-}
-
-message LatestBlockResponse {
-  Block block = 1;
-}
-
-message BlockUpdateRequest{
-  Block block = 1;
-}
-message BlockUpdateResponse {
-  Block block = 1;
-}
 
 message GetLatestBlockRequest {
-  // No fields, this is an empty message.
+  Empty empty = 1;
 }
 
-message GetBlockRequest {
+message BlockchainSyncRequest {
   bytes hash = 1;
+  string sender_address = 2;
 }
 
 /******************************** BLOCK MESSAGES */
