@@ -38,7 +38,7 @@ func (b *Block) CalculateHash() []byte {
 	for _, t := range b.Transactions {
 		transactionsStrings = append(transactionsStrings, string(t.Sender)+string(t.Receiver)+strconv.FormatFloat(t.Amount, 'f', -1, 32))
 	}
-	data := strconv.FormatUint((b.Index), 10) + strconv.FormatUint(b.Timestamp, 10) + strings.Join(transactionsStrings, "") + string(b.PreviousHash) + strconv.FormatUint(b.Data, 10)
+	data := strconv.FormatUint(b.Index, 10) + strconv.FormatUint(b.Timestamp, 10) + strings.Join(transactionsStrings, "") + string(b.PreviousHash) + strconv.FormatUint(b.Data, 10)
 	hash := sha256.Sum256([]byte(data))
 	return hash[:]
 }

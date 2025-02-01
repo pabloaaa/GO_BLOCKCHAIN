@@ -6,5 +6,5 @@ import (
 
 type BlockMessageHandlerInterface interface {
 	HandleBlockMessage(msg *block_chain.BlockMessage)
-	BroadcastLatestBlock(nodes [][]byte)
+	SetSenderAddress(address string)
 }

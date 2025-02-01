@@ -2,7 +2,10 @@ package src
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"io/ioutil"
+	"log"
 	"sync"
 	"time"
 
@@ -25,13 +28,23 @@ func NewBlockchain() *Blockchain {
 
 // createGenesisBlock creates the genesis block.
 func (bc *Blockchain) createGenesisBlock() {
-	genesisBlock := &types.Block{
-		Index:        0,
-		Timestamp:    uint64(time.Now().Unix()),
-		Transactions: make([]types.Transaction, 0),
-		PreviousHash: []byte("0"),
-		Data:         0,
+	// Odczytaj plik konfiguracyjny
+	configData, err := ioutil.ReadFile("/Users/pawelnowakowski/go_projects/src/GO_BLOCKCHAIN/config.json")
+	if err != nil {
+		log.Fatalf("Failed to read config file: %v", err)
 	}
+
+	// Zdekoduj dane genesis block
+	var config struct {
+		GenesisBlock types.Block `json:"genesis_block"`
+	}
+	err = json.Unmarshal(configData, &config)
+	if err != nil {
+		log.Fatalf("Failed to unmarshal config data: %v", err)
+	}
+
+	// Utwórz genesis block na podstawie danych z pliku konfiguracyjnego
+	genesisBlock := &config.GenesisBlock
 	bc.root = &types.BlockNode{
 		Block:  genesisBlock,
 		Parent: nil,
@@ -49,7 +62,17 @@ func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) erro
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
 
+	log.Printf("Attempting to add block with index %d", block.Index)
+
+	// Check if a block with the same index already exists
+	existingBlockNode := bc.GetBlockByIndex(block.Index)
+	if existingBlockNode != nil {
+		log.Printf("Block with index %d already exists", block.Index)
+		return errors.New("Block with the same index already exists")
+	}
+
 	if err := bc.ValidateBlock(block, parent.Block); err != nil {
+		log.Printf("Block validation failed: %v", err)
 		return err
 	}
 
@@ -64,6 +87,7 @@ func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) erro
 	// Call ApproveBlock to check and set checkpoint
 	bc.ApproveBlock(blockNode)
 
+	log.Printf("Block with index %d added successfully", block.Index)
 	return nil
 }
 
@@ -72,6 +96,7 @@ func (bc *Blockchain) ApproveBlock(blockNode *types.BlockNode) {
 	if blockNode.Block.Index%10 == 0 {
 		blockNode.Block.Checkpoint = true
 	}
+	blockNode.Block.Checkpoint = false
 }
 
 // ValidateBlock validates a block against its parent block.
@@ -84,8 +109,8 @@ func (bc *Blockchain) ValidateBlock(block *types.Block, parentBlock *types.Block
 		return errors.New("Previous hash is not valid")
 	}
 
-	hashPrefix := block.CalculateHash()[:3]
-	if !bytes.Equal(hashPrefix, []byte("000")) {
+	hashPrefix := block.CalculateHash()[:2]
+	if !bytes.Equal(hashPrefix, []byte("00")) {
 		return errors.New("Block hash is not valid")
 	}
 
@@ -119,12 +144,11 @@ func (bc *Blockchain) BlockExists(hash []byte) bool {
 	return bc.GetBlock(hash) != nil
 }
 
-// traverseTree traverses the blockchain tree and applies a callback function to each node.
-func (bc *Blockchain) traverseTree(callback func(node *types.BlockNode) bool) {
+// TraverseTree traverses the blockchain tree and applies a callback function to each node.
+func (bc *Blockchain) TraverseTree(callback func(node *types.BlockNode) bool) {
 	var queue []*types.BlockNode
 
 	queue = append(queue, bc.root)
-
 	for len(queue) > 0 {
 		node := queue[0]
 		queue = queue[1:]
@@ -142,7 +166,7 @@ func (bc *Blockchain) traverseTree(callback func(node *types.BlockNode) bool) {
 // GetBlock returns a block node by its hash.
 func (bc *Blockchain) GetBlock(hash []byte) *types.BlockNode {
 	var foundNode *types.BlockNode
-	bc.traverseTree(func(node *types.BlockNode) bool {
+	bc.TraverseTree(func(node *types.BlockNode) bool {
 		calculatedHash := node.Block.CalculateHash()
 		if bytes.Equal(calculatedHash, hash) {
 			foundNode = node
@@ -153,19 +177,49 @@ func (bc *Blockchain) GetBlock(hash []byte) *types.BlockNode {
 	return foundNode
 }
 
-// GetLatestBlock returns the latest block in the blockchain.
+// GetBlockByIndex returns a block node by its index.
+func (bc *Blockchain) GetBlockByIndex(index uint64) *types.BlockNode {
+	var foundNode *types.BlockNode
+	bc.TraverseTree(func(node *types.BlockNode) bool {
+		if node.Block.Index == index {
+			foundNode = node
+			return true
+		}
+		return false
+	})
+	return foundNode
+}
+
+// GetLatestBlock returns the latest approved block in the blockchain, or the latest block if no approved block exists.
 func (bc *Blockchain) GetLatestBlock() *types.Block {
+	var latestApprovedBlock *types.Block
+	var latestBlock *types.Block
+	bc.TraverseTree(func(node *types.BlockNode) bool {
+		if node.Block.Checkpoint {
+			latestApprovedBlock = node.Block
+		}
+		latestBlock = node.Block
+		return false
+	})
+	if latestApprovedBlock == nil {
+		return latestBlock
+	}
+	return latestApprovedBlock
+}
+
+// GetLatestBlockNode returns the latest block node in the blockchain.
+func (bc *Blockchain) GetLatestBlockNode() *types.BlockNode {
 	var longestPath []*types.BlockNode
-	bc.traverseTree(func(node *types.BlockNode) bool {
+	bc.TraverseTree(func(node *types.BlockNode) bool {
 		if len(node.Childs) > len(longestPath) {
 			longestPath = node.Childs
 		}
 		return false
 	})
 	if len(longestPath) == 0 {
-		return bc.root.Block
+		return bc.root
 	}
-	return longestPath[len(longestPath)-1].Block
+	return longestPath[len(longestPath)-1]
 }
 
 // GenerateNewBlock generates a new block with the given transactions.

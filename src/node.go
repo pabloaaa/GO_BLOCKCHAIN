@@ -1,10 +1,11 @@
 package src
 
 import (
+	"fmt"
 	"log"
 	"math/rand"
 	"net"
-	"time"
+	"sync"
 
 	"github.com/pabloaaa/GO_BLOCKCHAIN/interfaces"
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
@@ -22,16 +23,18 @@ type Node struct {
 	nodes            [][]byte
 	blockHandler     interfaces.BlockMessageHandlerInterface
 	nodeHandler      interfaces.NodeMessageHandlerInterface
-	tcpMessageSender interfaces.MessageSender
+	tcpMessageSender *TcpMessageSender
 	address          string
+	mux              sync.Mutex // Add a mutex to the Node struct
 }
 
-func NewNode(blockchain interfaces.BlockchainInterface, address string) *Node {
-	messageSender, _ := NewTCPSender(address)
+func NewNode(blockchain interfaces.BlockchainInterface, address string, tcpMessageSender *TcpMessageSender) *Node {
+	log.Printf("Initializing node with address: %s", address)
+
 	node := &Node{
 		blockchain:       blockchain,
 		nodes:            make([][]byte, 0),
-		tcpMessageSender: messageSender,
+		tcpMessageSender: tcpMessageSender,
 		address:          address,
 	}
 	node.blockHandler = NewBlockMessageHandler(blockchain, node.tcpMessageSender)
@@ -51,21 +54,22 @@ func (n *Node) GetAddress() string {
 	return n.address
 }
 
-func (n *Node) GetMessageSender() interfaces.MessageSender {
+func (n *Node) GetMessageSender() *TcpMessageSender {
 	return n.tcpMessageSender
 }
 
 func (n *Node) Start() {
+	log.Printf("Node starting on address: %s", n.address)
+
 	ln, err := net.Listen("tcp", n.address)
 	if err != nil {
 		log.Fatalf("Failed to listen on address %s: %v", n.address, err)
 	}
 	defer ln.Close()
 
-	n.BroadcastAddress([]byte(n.address))
-	go n.TryToFindNewBlock()
+	n.nodeHandler.BroadcastAddress([]byte(n.address))
 
-	go n.blockHandler.BroadcastLatestBlock(n.nodes) // Implement this method
+	// go n.blockHandler.BroadcastLatestBlock(n.nodes) // trzeba doimplementowac
 
 	for {
 		conn, err := ln.Accept()
@@ -86,21 +90,23 @@ func (n *Node) handleConnection(conn net.Conn) {
 		return
 	}
 
-	var blockMessage block_chain.BlockMessage
-	err = proto.Unmarshal(buf[:nRead], &blockMessage)
-	if err == nil {
-		n.blockHandler.HandleBlockMessage(&blockMessage)
+	var mainMessage block_chain.MainMessage
+	err = proto.Unmarshal(buf[:nRead], &mainMessage)
+	if err != nil {
+		log.Printf("Failed to unmarshal main message: %v", err)
 		return
 	}
 
-	var nodeMessage block_chain.NodeMessage
-	err = proto.Unmarshal(buf[:nRead], &nodeMessage)
-	if err == nil {
-		n.nodeHandler.HandleNodeMessage(&nodeMessage)
-		return
+	switch msg := mainMessage.MessageType.(type) {
+	case *block_chain.MainMessage_BlockMessage:
+		log.Printf("Received block message")
+		n.blockHandler.HandleBlockMessage(msg.BlockMessage)
+	case *block_chain.MainMessage_NodeMessage:
+		log.Printf("Received node message")
+		n.nodeHandler.HandleNodeMessage(msg.NodeMessage)
+	default:
+		log.Printf("Unknown message type: %T", msg)
 	}
-
-	log.Println("Failed to unmarshal message")
 }
 
 func (n *Node) getRandomNodes(count int) [][]byte {
@@ -116,23 +122,91 @@ func (n *Node) getRandomNodes(count int) [][]byte {
 }
 
 func (n *Node) TryToFindNewBlock() {
-	for {
-		transaction := []types.Transaction{
-			{Sender: []byte("Alice"), Receiver: []byte("Bob"), Amount: 10},
-		}
-		newBlock := n.blockchain.GenerateNewBlock(transaction)
-		nonce := uint64(0)
+	log.Println("Starting to find a new block...")
 
-		for {
-			newBlock.Data = nonce
-			parentBlock := n.blockchain.GetLatestBlock()
-			if err := n.blockchain.ValidateBlock(newBlock, parentBlock); err == nil {
-				break
-			}
-			nonce++
-		}
+	n.mux.Lock() // Lock the mutex before generating the new block
 
-		n.blockchain.AddBlock(n.blockchain.GetRoot(), newBlock)
-		time.Sleep(10 * time.Second)
+	// Get the latest approved block or the latest block if no approved block exists
+	parentBlock := n.blockchain.GetLatestBlock()
+	log.Printf("Latest block index: %d", parentBlock.Index)
+
+	// Generate a new block with the correct index
+	transaction := []types.Transaction{
+		{Sender: []byte("Alice"), Receiver: []byte("Bob"), Amount: 10},
 	}
+	newBlock := n.blockchain.GenerateNewBlock(transaction)
+	newBlock.Index = parentBlock.Index + 1
+	newBlock.PreviousHash = parentBlock.CalculateHash()
+
+	// Validate the new block
+	nonce := uint64(0)
+	for {
+		newBlock.Data = nonce
+		if err := n.blockchain.ValidateBlock(newBlock, parentBlock); err == nil {
+			break
+		}
+		nonce++
+	}
+
+	// Add the new block to the blockchain
+	latestBlockNode := n.blockchain.GetBlock(parentBlock.CalculateHash())
+	if latestBlockNode == nil {
+		log.Printf("Failed to find the latest block node")
+		n.mux.Unlock()
+		return
+	}
+
+	err := n.blockchain.AddBlock(latestBlockNode, newBlock)
+	if err != nil {
+		log.Printf("Failed to add block: %v", err)
+		n.mux.Unlock()
+		return
+	} else {
+		log.Printf("Added new block: %v", newBlock)
+		// Broadcast the new block to other nodes if it has a checkpoint
+		if newBlock.Checkpoint {
+			log.Println("Broadcasting latest block to nodes")
+			// n.blockHandler.BroadcastLatestBlock(n.nodes)  trzeba doimplementowac
+		}
+	}
+
+	n.mux.Unlock() // Unlock the mutex after adding the block
+}
+
+func (n *Node) SyncNodes(address string) error {
+	log.Printf("Synchronizing with node at address: %s from node: %s", address, n.address)
+	latestBlockHash := n.blockchain.GetLatestBlock().CalculateHash()
+	mainMessage := &block_chain.MainMessage{
+		MessageType: &block_chain.MainMessage_BlockMessage{
+			BlockMessage: &block_chain.BlockMessage{
+				BlockMessageType: &block_chain.BlockMessage_BlockchainSyncRequest{
+					BlockchainSyncRequest: &block_chain.BlockchainSyncRequest{
+						Hash:          latestBlockHash,
+						SenderAddress: n.address,
+					},
+				},
+			},
+		},
+	}
+	log.Printf("Created BlockMessage_BlockchainSyncRequest: %v", mainMessage)
+
+	data, err := EncodeMessage(mainMessage)
+	if err != nil {
+		return fmt.Errorf("failed to marshal MainMessage: %v", err)
+	}
+
+	if len(data) == 0 {
+		log.Println("Encoded data is empty")
+	} else {
+		log.Printf("Encoded MainMessage: %x", data)
+	}
+
+	// Send the message to the other node
+	log.Printf("Sending MainMessage to address: %s from node: %s with payload: %x", address, n.address, data)
+	err = n.tcpMessageSender.SendMsgToAddress(address, data)
+	if err != nil {
+		return fmt.Errorf("failed to send message: %v", err)
+	}
+
+	return nil
 }

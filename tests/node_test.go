@@ -147,6 +147,7 @@ func TestNodeSync(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Sprawdzamy, czy oba nody mają teraz taką samą liczbę bloków
+	log.Printf("Node1 blocks: %d, Node2 blocks: %d", len(node1.GetBlockchain().GetRoot().Childs), len(node2.GetBlockchain().GetRoot().Childs))
 	if len(node1.GetBlockchain().GetRoot().Childs) != len(node2.GetBlockchain().GetRoot().Childs) {
 		t.Errorf("Expected both nodes to have the same number of blocks, but got %d and %d", len(node1.GetBlockchain().GetRoot().Childs), len(node2.GetBlockchain().GetRoot().Childs))
 	}
