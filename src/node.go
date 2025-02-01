@@ -24,11 +24,11 @@ type Node struct {
 	blockHandler     interfaces.BlockMessageHandlerInterface
 	nodeHandler      interfaces.NodeMessageHandlerInterface
 	tcpMessageSender *TcpMessageSender
-	address          string
-	mux              sync.Mutex // Add a mutex to the Node struct
+	address          []byte
+	mux              sync.Mutex
 }
 
-func NewNode(blockchain interfaces.BlockchainInterface, address string, tcpMessageSender *TcpMessageSender) *Node {
+func NewNode(blockchain interfaces.BlockchainInterface, address []byte, tcpMessageSender *TcpMessageSender, bootstrapAddress []byte) *Node {
 	log.Printf("Initializing node with address: %s", address)
 
 	node := &Node{
@@ -38,7 +38,13 @@ func NewNode(blockchain interfaces.BlockchainInterface, address string, tcpMessa
 		address:          address,
 	}
 	node.blockHandler = NewBlockMessageHandler(blockchain, node.tcpMessageSender)
-	node.nodeHandler = NewNodeMessageHandler(node)
+	node.nodeHandler = NewNodeMessageHandler(node.tcpMessageSender, &node.nodes)
+
+	// If bootstrapAddress is provided, add it to the list of nodes
+	if len(bootstrapAddress) > 0 {
+		node.nodes = append(node.nodes, bootstrapAddress)
+	}
+
 	return node
 }
 
@@ -50,7 +56,7 @@ func (n *Node) GetNodes() [][]byte {
 	return n.nodes
 }
 
-func (n *Node) GetAddress() string {
+func (n *Node) GetAddress() []byte {
 	return n.address
 }
 
@@ -61,13 +67,16 @@ func (n *Node) GetMessageSender() *TcpMessageSender {
 func (n *Node) Start() {
 	log.Printf("Node starting on address: %s", n.address)
 
-	ln, err := net.Listen("tcp", n.address)
+	ln, err := net.Listen("tcp", string(n.address))
 	if err != nil {
 		log.Fatalf("Failed to listen on address %s: %v", n.address, err)
 	}
 	defer ln.Close()
 
-	n.nodeHandler.BroadcastAddress([]byte(n.address))
+	// Sprawdź, czy node.address nie jest równy bootstrapAddress
+	if len(n.nodes) > 0 && string(n.nodes[0]) != string(n.address) {
+		n.nodeHandler.BroadcastAddress(n.nodes, n.address)
+	}
 
 	// go n.blockHandler.BroadcastLatestBlock(n.nodes) // trzeba doimplementowac
 
@@ -173,7 +182,7 @@ func (n *Node) TryToFindNewBlock() {
 	n.mux.Unlock() // Unlock the mutex after adding the block
 }
 
-func (n *Node) SyncNodes(address string) error {
+func (n *Node) SyncNodes(address []byte) error {
 	log.Printf("Synchronizing with node at address: %s from node: %s", address, n.address)
 	latestBlockHash := n.blockchain.GetLatestBlock().CalculateHash()
 	mainMessage := &block_chain.MainMessage{

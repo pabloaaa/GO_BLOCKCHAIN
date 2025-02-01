@@ -13,22 +13,26 @@ import (
 type BlockMessageHandlerImpl struct {
 	blockchain    interfaces.BlockchainInterface
 	messageSender interfaces.MessageSender
-	senderAddress string
+	senderAddress []byte
+	factory       *MessageFactory
 }
 
 // NewBlockMessageHandler creates a new BlockMessageHandlerImpl.
 func NewBlockMessageHandler(blockchain interfaces.BlockchainInterface, messageSender interfaces.MessageSender) *BlockMessageHandlerImpl {
-	return &BlockMessageHandlerImpl{blockchain: blockchain, messageSender: messageSender}
+	return &BlockMessageHandlerImpl{
+		blockchain:    blockchain,
+		messageSender: messageSender,
+		factory:       NewMessageFactory(),
+	}
 }
 
 // SetSenderAddress sets the sender address.
-func (h *BlockMessageHandlerImpl) SetSenderAddress(address string) {
+func (h *BlockMessageHandlerImpl) SetSenderAddress(address []byte) {
 	h.senderAddress = address
 }
 
 // HandleBlockMessage processes incoming block messages.
 func (h *BlockMessageHandlerImpl) HandleBlockMessage(msg *block_chain.BlockMessage) {
-	log.Printf("Handling block message of type: %T from node: %s with payload: %v", msg.BlockMessageType, h.blockchain.GetLatestBlock().PreviousHash, msg)
 	switch blockMsg := msg.BlockMessageType.(type) {
 	case *block_chain.BlockMessage_BlockchainSyncRequest:
 		log.Println("Handling BlockchainSyncRequest")
@@ -39,9 +43,9 @@ func (h *BlockMessageHandlerImpl) HandleBlockMessage(msg *block_chain.BlockMessa
 	}
 }
 
-func (h *BlockMessageHandlerImpl) handleBlockchainSyncRequest(hash []byte, senderAddress string) {
+func (h *BlockMessageHandlerImpl) handleBlockchainSyncRequest(hash []byte, senderAddress []byte) {
 	h.senderAddress = senderAddress
-	log.Printf("Adres nadawcy: %s", senderAddress) // Dodane logowanie adresu nadawcy
+	log.Printf("Adres nadawcy: %s", senderAddress)
 
 	blockNode := h.blockchain.GetBlock(hash)
 	if blockNode == nil {
@@ -66,22 +70,14 @@ func (h *BlockMessageHandlerImpl) handleBlockchainSyncRequest(hash []byte, sende
 		Blocks: protoBlocks,
 	}
 
-	mainMessage := &block_chain.MainMessage{
-		MessageType: &block_chain.MainMessage_BlockMessage{
-			BlockMessage: &block_chain.BlockMessage{
-				BlockMessageType: &block_chain.BlockMessage_BlocksResponse{
-					BlocksResponse: blocksResponse,
-				},
-			},
-		},
-	}
-
-	data, err := EncodeMessage(mainMessage)
+	// Przygotuj wiadomość do wysłania
+	data, err := PrepareProtoMessageToSend(h.factory, blocksResponse)
 	if err != nil {
 		log.Printf("Failed to encode BlocksResponse: %v", err)
 		return
 	}
 
+	// Wyślij wiadomość BlocksResponse do nadawcy
 	err = h.messageSender.SendMsgToAddress(h.senderAddress, data)
 	if err != nil {
 		log.Printf("Failed to send BlocksResponse: %v", err)

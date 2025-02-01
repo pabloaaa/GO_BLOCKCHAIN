@@ -26,24 +26,20 @@ message BlockMessage {
 // Node-related messages
 message NodeMessage {
   oneof node_message_type {
-    NodesResponse nodes_response = 1;
-    WelcomeRequest welcome_request = 2;
-    WelcomeResponse welcome_response = 3;
-    PongResponse pong_response = 4;
-    Empty empty = 5;
+    WelcomeRequest welcome_request = 1;
+    WelcomeResponse welcome_response = 2;
+    PongResponse pong_response = 3;
+    Empty empty = 4;
   }
 }
 
 //******************************** NODE MESSAGES */
 
-message NodesResponse {
-  repeated bytes nodes = 1;
-}
 message WelcomeRequest {
-  bytes message = 1;
+  bytes sender_address = 1;
 }
 message WelcomeResponse {
-  bytes message = 1;
+  repeated bytes node_adresses = 1;
 }
 message PongResponse {
   bool success = 1;
@@ -84,7 +80,7 @@ message GetLatestBlockRequest {
 
 message BlockchainSyncRequest {
   bytes hash = 1;
-  string sender_address = 2;
+  bytes sender_address = 2;
 }
 
 /******************************** BLOCK MESSAGES */

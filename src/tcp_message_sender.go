@@ -15,8 +15,8 @@ func NewTCPSender() *TcpMessageSender {
 }
 
 // SendMsgToAddress sends a message over TCP to the specified address.
-func (s *TcpMessageSender) SendMsgToAddress(address string, data []byte) error {
-	conn, err := net.Dial("tcp", address)
+func (s *TcpMessageSender) SendMsgToAddress(address []byte, data []byte) error {
+	conn, err := net.Dial("tcp", string(address))
 	if err != nil {
 		log.Printf("Failed to dial TCP address %s: %v", address, err)
 		return err

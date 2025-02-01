@@ -1,8 +1,6 @@
 package src
 
 import (
-	"fmt"
-
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 	"google.golang.org/protobuf/proto"
 )
@@ -16,22 +14,21 @@ func EncodeMessage(message proto.Message) ([]byte, error) {
 	return data, nil
 }
 
-// WrapMessage wraps a message in the appropriate protobuf message type.
-func WrapMessage(msg proto.Message) (*block_chain.MainMessage, error) {
-	switch m := msg.(type) {
-	case *block_chain.BlockMessage:
-		return &block_chain.MainMessage{
-			MessageType: &block_chain.MainMessage_BlockMessage{
-				BlockMessage: m,
-			},
-		}, nil
-	case *block_chain.NodeMessage:
-		return &block_chain.MainMessage{
-			MessageType: &block_chain.MainMessage_NodeMessage{
-				NodeMessage: m,
-			},
-		}, nil
-	default:
-		return nil, fmt.Errorf("unknown message type: %T", msg)
+// PrepareProtoMessageToSend prepares a proto message to be sent.
+func PrepareProtoMessageToSend(factory *MessageFactory, message proto.Message) ([]byte, error) {
+	var mainMessage *block_chain.MainMessage
+	var err error
+
+	switch message.(type) {
+	case *block_chain.WelcomeRequest, *block_chain.WelcomeResponse:
+		mainMessage, err = factory.CreateNodeMessage(message)
+	case *block_chain.BlocksResponse, *block_chain.BlockchainSyncRequest:
+		mainMessage, err = factory.CreateBlockMessage(message)
 	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return EncodeMessage(mainMessage)
 }

@@ -6,6 +6,5 @@ import (
 
 type NodeMessageHandlerInterface interface {
 	HandleNodeMessage(msg *block_chain.NodeMessage)
-	BroadcastAddress(address []byte)
-	SetSenderAddress(address string)
+	BroadcastAddress(address [][]byte, sender_address []byte)
 }

@@ -25,13 +25,14 @@ func main() {
 	// Pobierz port z argumentów
 	port := flag.String("port", "50001", "port to listen on")
 	httpPort := flag.String("httpPort", "60001", "HTTP port to listen on")
+	bootstrapAddress := flag.String("bootstrapAddress", "localhost:50001", "address of the bootstrap node")
 	flag.Parse()
 
 	// Inicjalizacja tcpMessageSender
 	tcpMessageSender := src.NewTCPSender()
 
 	// Inicjalizacja noda
-	node = src.NewNode(blockchain, "localhost:"+*port, tcpMessageSender)
+	node = src.NewNode(blockchain, []byte("localhost:"+*port), tcpMessageSender, []byte(*bootstrapAddress))
 
 	// Start TCP server
 	go node.Start()
@@ -64,7 +65,7 @@ func syncNodes(c *gin.Context) {
 
 	log.Printf("Starting synchronization with node: %s from node: %s", otherNodeAddress, node.GetAddress())
 
-	err := node.SyncNodes(otherNodeAddress)
+	err := node.SyncNodes([]byte(otherNodeAddress))
 	if err != nil {
 		log.Printf("Failed to synchronize nodes: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to synchronize nodes"})
