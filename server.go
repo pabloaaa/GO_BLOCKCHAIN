@@ -91,6 +91,14 @@ func getStatus(c *gin.Context) {
 		html += fmt.Sprintf("<li>Index: %d, Timestamp: %d, Previous Hash: %x, Hash: %x, Transactions: %v, Data: %d, Checkpoint: %t</li>",
 			block.Index, block.Timestamp, block.PreviousHash, hash, block.Transactions, block.Data, block.Checkpoint)
 	}
+	html += "</ul>"
+
+	// Dodaj adres noda i adresy innych połączonych nodów
+	html += fmt.Sprintf("<h2>Node Address: %s</h2>", string(node.GetAddress()))
+	html += "<h2>Connected Nodes:</h2><ul>"
+	for _, addr := range node.GetNodes() {
+		html += fmt.Sprintf("<li>%s</li>", string(addr))
+	}
 	html += "</ul></body></html>"
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))

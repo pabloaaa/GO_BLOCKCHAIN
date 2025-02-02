@@ -53,12 +53,20 @@ func (h *NodeMessageHandlerImpl) handleWelcomeRequest(senderAddress []byte) {
 	} else {
 		log.Printf("Successfully sent welcome response to node at address %s", string(senderAddress))
 	}
-	*h.nodes = append(*h.nodes, senderAddress)
+
+	// Dodaj adres nadawcy do listy nodów, jeśli nie jest to adres własny
+	if !containsAddress(*h.nodes, senderAddress) {
+		*h.nodes = append(*h.nodes, senderAddress)
+	}
 }
 
 // handleWelcomeResponse processes a welcome response message.
 func (h *NodeMessageHandlerImpl) handleWelcomeResponse(nodes_addresses [][]byte) {
-	*h.nodes = append(*h.nodes, nodes_addresses...)
+	for _, addr := range nodes_addresses {
+		if !containsAddress(*h.nodes, addr) {
+			*h.nodes = append(*h.nodes, addr)
+		}
+	}
 }
 
 // BroadcastAddress sends the node's address to all known nodes.
@@ -82,4 +90,14 @@ func (h *NodeMessageHandlerImpl) BroadcastAddress(nodes [][]byte, sender_address
 			log.Printf("Successfully sent welcome request to node at address %s", node)
 		}
 	}
+}
+
+// containsAddress checks if the given address is in the list of addresses.
+func containsAddress(addresses [][]byte, address []byte) bool {
+	for _, addr := range addresses {
+		if string(addr) == string(address) {
+			return true
+		}
+	}
+	return false
 }

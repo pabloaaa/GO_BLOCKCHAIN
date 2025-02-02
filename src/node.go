@@ -40,8 +40,8 @@ func NewNode(blockchain interfaces.BlockchainInterface, address []byte, tcpMessa
 	node.blockHandler = NewBlockMessageHandler(blockchain, node.tcpMessageSender)
 	node.nodeHandler = NewNodeMessageHandler(node.tcpMessageSender, &node.nodes)
 
-	// If bootstrapAddress is provided, add it to the list of nodes
-	if len(bootstrapAddress) > 0 {
+	// If bootstrapAddress is provided and not the same as node address, add it to the list of nodes
+	if len(bootstrapAddress) > 0 && string(bootstrapAddress) != string(address) {
 		node.nodes = append(node.nodes, bootstrapAddress)
 	}
 
