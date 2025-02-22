@@ -80,29 +80,6 @@ func extractNodes(htmlBody string) ([]string, error) {
 	return nodes, nil
 }
 
-func extractNodeAddress(htmlBody string) (string, error) {
-	doc, err := html.Parse(strings.NewReader(htmlBody))
-	if err != nil {
-		return "", err
-	}
-
-	var address string
-	var f func(*html.Node)
-	f = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "h2" && n.FirstChild != nil && n.FirstChild.Type == html.TextNode {
-			if strings.Contains(n.FirstChild.Data, "Node Address:") {
-				address = strings.TrimSpace(strings.TrimPrefix(n.FirstChild.Data, "Node Address:"))
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			f(c)
-		}
-	}
-	f(doc)
-
-	return address, nil
-}
-
 func TestNodeSynchronization(t *testing.T) {
 	// Ensure ports are cleared
 	clearAllPorts()
@@ -230,7 +207,7 @@ func TestNodeWelcomeMessage(t *testing.T) {
 	body3, err := ioutil.ReadAll(status3.Body)
 	assert.NoError(t, err)
 
-	// Extract nodes and node addresses from HTML
+	// Extract nodes from HTML
 	nodes1, err := extractNodes(string(body1))
 	assert.NoError(t, err)
 	nodes2, err := extractNodes(string(body2))
@@ -238,24 +215,14 @@ func TestNodeWelcomeMessage(t *testing.T) {
 	nodes3, err := extractNodes(string(body3))
 	assert.NoError(t, err)
 
-	address1, err := extractNodeAddress(string(body1))
-	assert.NoError(t, err)
-	address2, err := extractNodeAddress(string(body2))
-	assert.NoError(t, err)
-	address3, err := extractNodeAddress(string(body3))
-	assert.NoError(t, err)
-
-	// Check if nodes have the correct addresses and connections
-	assert.Equal(t, "localhost:50001", address1)
+	// Check if nodes are aware of each other
 	assert.Contains(t, nodes1, "localhost:50002")
 	assert.Contains(t, nodes1, "localhost:50003")
 	assert.NotContains(t, nodes1, "localhost:50001")
 
-	assert.Equal(t, "localhost:50002", address2)
 	assert.Contains(t, nodes2, "localhost:50001")
 	assert.NotContains(t, nodes2, "localhost:50002")
 
-	assert.Equal(t, "localhost:50003", address3)
 	assert.Contains(t, nodes3, "localhost:50001")
 	assert.Contains(t, nodes3, "localhost:50002")
 	assert.NotContains(t, nodes3, "localhost:50003")

@@ -1,9 +1,20 @@
 package src
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 	"google.golang.org/protobuf/proto"
 )
+
+// CreateSendingPort creates a sending port based on the local port and the bootstrap address.
+func CreateSendingPort(localPort, bootstrapPort string) string {
+	localPortSuffix := strings.TrimPrefix(localPort, "500")
+	bootstrapPortSuffix := strings.TrimPrefix(bootstrapPort, "500")
+	return fmt.Sprintf("40%s%s", localPortSuffix, bootstrapPortSuffix)
+}
 
 // EncodeMessage encodes a protobuf message into a byte slice.
 func EncodeMessage(message proto.Message) ([]byte, error) {
@@ -31,4 +42,16 @@ func PrepareProtoMessageToSend(factory *MessageFactory, message proto.Message) (
 	}
 
 	return EncodeMessage(mainMessage)
+}
+
+// ExtractPort extracts the port number from an address string or a port string.
+func ExtractPort(address string) (int, error) {
+	if strings.Contains(address, ":") {
+		parts := strings.Split(address, ":")
+		if len(parts) != 2 {
+			return 0, fmt.Errorf("invalid address format")
+		}
+		return strconv.Atoi(parts[1])
+	}
+	return strconv.Atoi(address)
 }
