@@ -30,18 +30,18 @@ func NewNodeMessageHandler(messageSender interfaces.MessageSender, nodesAddresse
 func (h *NodeMessageHandlerImpl) HandleNodeMessage(msg *block_chain.NodeMessage) {
 	switch nodeMsg := msg.NodeMessageType.(type) {
 	case *block_chain.NodeMessage_WelcomeRequest:
-		log.Printf("NodeMessageHandlerImpl: Handling WelcomeRequest from %s", nodeMsg.WelcomeRequest.SenderAddress)
+		log.Printf("\033[32mNodeMessageHandlerImpl: Handling WelcomeRequest from %s\033[0m", nodeMsg.WelcomeRequest.SenderAddress)
 		senderPort, _ := strconv.Atoi(string(nodeMsg.WelcomeRequest.SenderAddress))
 		h.handleWelcomeRequest(senderPort)
 	case *block_chain.NodeMessage_WelcomeResponse:
-		log.Printf("NodeMessageHandlerImpl: Handling WelcomeResponse")
+		log.Printf("\033[32mNodeMessageHandlerImpl: Handling WelcomeResponse\033[0m")
 		h.handleWelcomeResponse(nodeMsg.WelcomeResponse.NodeAdresses)
 	}
 }
 
 // handleWelcomeRequest processes a welcome request message.
 func (h *NodeMessageHandlerImpl) handleWelcomeRequest(senderAddress int) {
-	// Zbuduj wiadomość WelcomeResponse
+	// Build WelcomeResponse message
 	nodeAddresses := make([][]byte, len(*h.nodes))
 	for i, node := range *h.nodes {
 		nodeAddresses[i] = []byte(strconv.Itoa(node))
@@ -50,24 +50,24 @@ func (h *NodeMessageHandlerImpl) handleWelcomeRequest(senderAddress int) {
 		NodeAdresses: nodeAddresses,
 	}
 
-	// Przygotuj wiadomość do wysłania
+	// Prepare message to send
 	data, err := PrepareProtoMessageToSend(h.factory, welcomeResponse)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Wyślij wiadomość WelcomeResponse do nadawcy
+	// Send WelcomeResponse message to sender
 	err = h.messageSender.SendMsgToAddress(senderAddress, data, h.localPort)
 	if err != nil {
-		log.Printf("NodeMessageHandlerImpl: Failed to send welcome response to node at address %d: %v", senderAddress, err)
+		log.Printf("\033[32mNodeMessageHandlerImpl: Failed to send welcome response to node at address %d: %v\033[0m", senderAddress, err)
 	} else {
-		log.Printf("NodeMessageHandlerImpl: Successfully sent welcome response to node at address %d", senderAddress)
+		log.Printf("\033[32mNodeMessageHandlerImpl: Successfully sent welcome response to node at address %d\033[0m", senderAddress)
 	}
 
-	// Dodaj adres nadawcy do listy nodów, jeśli nie jest to adres własny
+	// Add sender address to nodes list if it is not the local address
 	if !containsAddress(*h.nodes, senderAddress) {
 		*h.nodes = append(*h.nodes, senderAddress)
-		log.Printf("NodeMessageHandlerImpl: Added sender address %d to nodes list", senderAddress)
+		log.Printf("\033[32mNodeMessageHandlerImpl: Added sender address %d to nodes list\033[0m", senderAddress)
 	}
 }
 
@@ -77,7 +77,7 @@ func (h *NodeMessageHandlerImpl) handleWelcomeResponse(nodes_addresses [][]byte)
 		nodeAddress, _ := strconv.Atoi(string(addr))
 		if !containsAddress(*h.nodes, nodeAddress) {
 			*h.nodes = append(*h.nodes, nodeAddress)
-			log.Printf("NodeMessageHandlerImpl: Added node address %d to nodes list", nodeAddress)
+			log.Printf("\033[32mNodeMessageHandlerImpl: Added node address %d to nodes list\033[0m", nodeAddress)
 		}
 	}
 }
@@ -89,18 +89,18 @@ func (h *NodeMessageHandlerImpl) BroadcastAddress(nodes []int, sender_address in
 			SenderAddress: []byte(strconv.Itoa(sender_address)),
 		}
 
-		// Przygotuj wiadomość do wysłania
+		// Prepare message to send
 		data, err := PrepareProtoMessageToSend(h.factory, welcomeRequest)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		// Wyślij wiadomość WelcomeRequest do węzła
+		// Send WelcomeRequest message to node
 		err = h.messageSender.SendMsgToAddress(node, data, h.localPort)
 		if err != nil {
-			log.Printf("NodeMessageHandlerImpl: Failed to send message to node at address %d: %v", node, err)
+			log.Printf("\033[32mNodeMessageHandlerImpl: Failed to send message to node at address %d: %v\033[0m", node, err)
 		} else {
-			log.Printf("NodeMessageHandlerImpl: Successfully sent welcome request to node at address %d", node)
+			log.Printf("\033[32mNodeMessageHandlerImpl: Successfully sent welcome request to node at address %d\033[0m", node)
 		}
 	}
 }

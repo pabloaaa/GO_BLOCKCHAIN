@@ -62,5 +62,10 @@ func (m *MockBlockchain) ReplaceBlocks(blocks []*types.Block) {
 	m.Called(blocks)
 }
 
+func (m *MockBlockchain) GetLatestApprovedBlock() *types.Block {
+	args := m.Called()
+	return args.Get(0).(*types.Block)
+}
+
 // Ensure MockBlockchain implements BlockchainInterface
 var _ interfaces.BlockchainInterface = (*MockBlockchain)(nil)

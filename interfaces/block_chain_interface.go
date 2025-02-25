@@ -6,6 +6,7 @@ import (
 
 type BlockchainInterface interface {
 	GetLatestBlock() *types.Block
+	GetLatestApprovedBlock() *types.Block
 	GetBlock(hash []byte) *types.BlockNode
 	AddBlock(parent *types.BlockNode, block *types.Block) error
 	ValidateBlock(block *types.Block, parent *types.Block) error

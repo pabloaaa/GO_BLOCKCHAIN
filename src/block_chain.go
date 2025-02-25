@@ -62,17 +62,17 @@ func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) erro
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
 
-	log.Printf("Attempting to add block with index %d", block.Index)
+	log.Printf("block_chain: Attempting to add block with index %d", block.Index)
 
 	// Check if a block with the same index already exists
 	existingBlockNode := bc.GetBlockByIndex(block.Index)
 	if existingBlockNode != nil {
-		log.Printf("Block with index %d already exists", block.Index)
+		log.Printf("block_chain: Block with index %d already exists", block.Index)
 		return errors.New("Block with the same index already exists")
 	}
 
 	if err := bc.ValidateBlock(block, parent.Block); err != nil {
-		log.Printf("Block validation failed: %v", err)
+		log.Printf("block_chain: Block validation failed: %v", err)
 		return err
 	}
 
@@ -87,7 +87,7 @@ func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) erro
 	// Call ApproveBlock to check and set checkpoint
 	bc.ApproveBlock(blockNode)
 
-	log.Printf("Block with index %d added successfully", block.Index)
+	log.Printf("block_chain: Block with index %d added successfully", block.Index)
 	return nil
 }
 
@@ -95,8 +95,11 @@ func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) erro
 func (bc *Blockchain) ApproveBlock(blockNode *types.BlockNode) {
 	if blockNode.Block.Index%10 == 0 {
 		blockNode.Block.Checkpoint = true
+		log.Printf("block_chain: Checkpoint set to true for block index %d", blockNode.Block.Index)
+	} else {
+		blockNode.Block.Checkpoint = false
 	}
-	blockNode.Block.Checkpoint = false
+	log.Printf("block_chain: ApproveBlock called for block index %d, Checkpoint: %t", blockNode.Block.Index, blockNode.Block.Checkpoint)
 }
 
 // ValidateBlock validates a block against its parent block.
@@ -114,6 +117,7 @@ func (bc *Blockchain) ValidateBlock(block *types.Block, parentBlock *types.Block
 		return errors.New("Block hash is not valid")
 	}
 
+	log.Printf("block_chain: Block validated successfully for block index %d", block.Index)
 	return nil
 }
 
@@ -190,20 +194,25 @@ func (bc *Blockchain) GetBlockByIndex(index uint64) *types.BlockNode {
 	return foundNode
 }
 
-// GetLatestBlock returns the latest approved block in the blockchain, or the latest block if no approved block exists.
+// GetLatestBlock returns the latest block in the blockchain.
 func (bc *Blockchain) GetLatestBlock() *types.Block {
-	var latestApprovedBlock *types.Block
 	var latestBlock *types.Block
+	bc.TraverseTree(func(node *types.BlockNode) bool {
+		latestBlock = node.Block
+		return false
+	})
+	return latestBlock
+}
+
+// GetLatestApprovedBlock returns the latest approved block in the blockchain.
+func (bc *Blockchain) GetLatestApprovedBlock() *types.Block {
+	var latestApprovedBlock *types.Block
 	bc.TraverseTree(func(node *types.BlockNode) bool {
 		if node.Block.Checkpoint {
 			latestApprovedBlock = node.Block
 		}
-		latestBlock = node.Block
 		return false
 	})
-	if latestApprovedBlock == nil {
-		return latestBlock
-	}
 	return latestApprovedBlock
 }
 

@@ -20,6 +20,7 @@ message BlockMessage {
     BlockchainSyncRequest blockchain_sync_request = 3;
     GetLatestBlockRequest get_latest_block_request = 4;
     Empty empty = 5;
+    ApprovedBlock approved_block = 6;
   }
 }
 
@@ -81,6 +82,11 @@ message GetLatestBlockRequest {
 message BlockchainSyncRequest {
   bytes hash = 1;
   bytes sender_address = 2;
+}
+
+message ApprovedBlock {
+  Block block = 1;
+  bytes address = 2;
 }
 
 /******************************** BLOCK MESSAGES */

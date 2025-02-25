@@ -112,7 +112,7 @@ func (m *TcpConnectionManager) GetSendingConnection(addressPort int) (net.Conn, 
 	return nil, false
 }
 
-// PortMap returns the port map.
+// GetPortMap returns the port map.
 func (m *TcpConnectionManager) GetPortMap() map[int]map[int]net.Conn {
 	m.mux.Lock()
 	defer m.mux.Unlock()

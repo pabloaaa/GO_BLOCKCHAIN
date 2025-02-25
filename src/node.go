@@ -13,11 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type Message struct {
-	Type []byte
-	Data []byte
-}
-
+// Node represents a node in the blockchain network.
 type Node struct {
 	blockchain           interfaces.BlockchainInterface
 	nodes                []int
@@ -29,8 +25,9 @@ type Node struct {
 	mux                  sync.Mutex
 }
 
+// NewNode creates a new Node.
 func NewNode(blockchain interfaces.BlockchainInterface, address int, tcpMessageSender *TcpMessageSender, bootstrapAddress int) *Node {
-	log.Printf("Node: Initializing node with address: %d", address)
+	log.Printf("\033[33mNode: Initializing node with address: %d\033[0m", address)
 
 	connectionManager := NewTcpConnectionManager(address)
 	node := &Node{
@@ -49,80 +46,87 @@ func NewNode(blockchain interfaces.BlockchainInterface, address int, tcpMessageS
 		node.tcpConnectionManager.ConnectToNode(bootstrapAddress)
 	}
 
-	log.Printf("Node: Node initialized with address: %d and bootstrap address: %d", address, bootstrapAddress)
+	log.Printf("\033[33mNode: Node initialized with address: %d and bootstrap address: %d\033[0m", address, bootstrapAddress)
 	return node
 }
 
+// GetBlockchain returns the blockchain interface.
 func (n *Node) GetBlockchain() interfaces.BlockchainInterface {
 	return n.blockchain
 }
 
+// GetNodes returns the list of connected nodes.
 func (n *Node) GetNodes() []int {
 	return n.nodes
 }
 
+// GetAddress returns the address of the node.
 func (n *Node) GetAddress() int {
 	return n.address
 }
 
+// GetMessageSender returns the TCP message sender.
 func (n *Node) GetMessageSender() *TcpMessageSender {
 	return n.tcpMessageSender
 }
 
+// Start starts the node and listens for incoming connections.
 func (n *Node) Start() {
-	log.Printf("Node: Node starting on address: %d", n.address)
+	log.Printf("\033[33mNode: Node starting on address: %d\033[0m", n.address)
 
 	ln, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", n.address))
 	if err != nil {
-		log.Fatalf("Node: Failed to listen on address %d: %v", n.address, err)
+		log.Fatalf("\033[33mNode: Failed to listen on address %d: %v\033[0m", n.address, err)
 	}
 	defer ln.Close()
 
-	// Sprawdź, czy node.address nie jest równy bootstrapAddress
+	// Check if node.address is not equal to bootstrapAddress
 	if len(n.nodes) > 0 && n.nodes[0] != n.address {
-		log.Printf("Node: Broadcasting address to nodes: %v", n.nodes)
+		log.Printf("\033[33mNode: Broadcasting address to nodes: %v\033[0m", n.nodes)
 		n.nodeHandler.BroadcastAddress(n.nodes, n.address)
 	}
 
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			log.Fatalf("Node: Failed to accept connection: %v", err)
+			log.Fatalf("\033[33mNode: Failed to accept connection: %v\033[0m", err)
 		}
-		log.Printf("Node: Accepted connection from: %s", conn.RemoteAddr().String())
+		log.Printf("\033[33mNode: Accepted connection from: %s\033[0m", conn.RemoteAddr().String())
 		go n.handleConnection(conn)
 	}
 }
 
+// handleConnection handles an incoming connection.
 func (n *Node) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	buf := make([]byte, 4096)
 	nRead, err := conn.Read(buf)
 	if err != nil {
-		log.Println("Node: Error reading from connection: ", err)
+		log.Println("\033[33mNode: Error reading from connection: \033[0m", err)
 		return
 	}
 
 	var mainMessage block_chain.MainMessage
 	err = proto.Unmarshal(buf[:nRead], &mainMessage)
 	if err != nil {
-		log.Printf("Node: Failed to unmarshal main message: %v", err)
+		log.Printf("\033[33mNode: Failed to unmarshal main message: %v\033[0m", err)
 		return
 	}
 
 	switch msg := mainMessage.MessageType.(type) {
 	case *block_chain.MainMessage_BlockMessage:
-		log.Printf("Node: Received block message")
+		log.Printf("\033[33mNode: Received block message\033[0m")
 		n.blockHandler.HandleBlockMessage(msg.BlockMessage)
 	case *block_chain.MainMessage_NodeMessage:
-		log.Printf("Node: Received node message")
+		log.Printf("\033[33mNode: Received node message\033[0m")
 		n.nodeHandler.HandleNodeMessage(msg.NodeMessage)
 	default:
-		log.Printf("Node: Unknown message type: %T", msg)
+		log.Printf("\033[33mNode: Unknown message type: %T\033[0m", msg)
 	}
 }
 
+// getRandomNodes returns a random subset of nodes.
 func (n *Node) getRandomNodes(count int) []int {
 	if count > len(n.nodes) {
 		count = len(n.nodes)
@@ -135,14 +139,15 @@ func (n *Node) getRandomNodes(count int) []int {
 	return n.nodes[:count]
 }
 
+// TryToFindNewBlock attempts to find a new block.
 func (n *Node) TryToFindNewBlock() {
-	log.Println("Node: Starting to find a new block...")
+	log.Println("\033[33mNode: Starting to find a new block...\033[0m")
 
 	n.mux.Lock() // Lock the mutex before generating the new block
 
 	// Get the latest approved block or the latest block if no approved block exists
 	parentBlock := n.blockchain.GetLatestBlock()
-	log.Printf("Node: Latest block index: %d", parentBlock.Index)
+	log.Printf("\033[33mNode: Latest block index: %d\033[0m", parentBlock.Index)
 
 	// Generate a new block with the correct index
 	transaction := []types.Transaction{
@@ -165,23 +170,23 @@ func (n *Node) TryToFindNewBlock() {
 	// Add the new block to the blockchain
 	latestBlockNode := n.blockchain.GetBlock(parentBlock.CalculateHash())
 	if latestBlockNode == nil {
-		log.Printf("Node: Failed to find the latest block node")
+		log.Printf("\033[33mNode: Failed to find the latest block node\033[0m")
 		n.mux.Unlock()
 		return
 	}
 
-	log.Printf("Node: Attempting to add block with index %d", newBlock.Index)
+	log.Printf("\033[33mNode: Attempting to add block with index %d\033[0m", newBlock.Index)
 	err := n.blockchain.AddBlock(latestBlockNode, newBlock)
 	if err != nil {
-		log.Printf("Node: Failed to add block: %v", err)
+		log.Printf("\033[33mNode: Failed to add block: %v\033[0m", err)
 		n.mux.Unlock()
 		return
 	} else {
-		log.Printf("Node: Block with index %d added successfully", newBlock.Index)
+		log.Printf("\033[33mNode: Block with index %d added successfully\033[0m", newBlock.Index)
 		// Broadcast the new block to other nodes if it has a checkpoint
 		if newBlock.Checkpoint {
-			log.Println("Node: Broadcasting latest block to nodes")
-			// n.blockHandler.BroadcastLatestBlock(n.nodes)  trzeba doimplementowac
+			log.Println("\033[33mNode: Broadcasting latest block to nodes\033[0m")
+			n.blockHandler.BroadcastApprovedBlock(newBlock, n.nodes)
 		}
 	}
 
@@ -189,8 +194,8 @@ func (n *Node) TryToFindNewBlock() {
 }
 
 func (n *Node) SyncNodes(address int) error {
-	log.Printf("Node: Synchronizing with node at address: %d from node: %d", address, n.address)
-	latestBlockHash := n.blockchain.GetLatestBlock().CalculateHash()
+	log.Printf("\033[33mNode: Synchronizing with node at address: %d from node: %d\033[0m", address, n.address)
+	latestBlockHash := n.blockchain.GetLatestApprovedBlock().CalculateHash()
 	mainMessage := &block_chain.MainMessage{
 		MessageType: &block_chain.MainMessage_BlockMessage{
 			BlockMessage: &block_chain.BlockMessage{
@@ -203,24 +208,24 @@ func (n *Node) SyncNodes(address int) error {
 			},
 		},
 	}
-	log.Printf("Node: Created BlockMessage_BlockchainSyncRequest: %v", mainMessage)
+	log.Printf("\033[33mNode: Created BlockMessage_BlockchainSyncRequest: %v\033[0m", mainMessage)
 
 	data, err := EncodeMessage(mainMessage)
 	if err != nil {
-		return fmt.Errorf("Node: failed to marshal MainMessage: %v", err)
+		return fmt.Errorf("\033[33mNode: failed to marshal MainMessage: %v\033[0m", err)
 	}
 
 	if len(data) == 0 {
-		log.Println("Node: Encoded data is empty")
+		log.Println("\033[33mNode: Encoded data is empty\033[0m")
 	} else {
-		log.Printf("Node: Encoded MainMessage: %x", data)
+		log.Printf("\033[33mNode: Encoded MainMessage: %x\033[0m", data)
 	}
 
 	// Send the message to the other node
-	log.Printf("Node: Sending MainMessage to address: %d from node: %d with payload: %x", address, n.address, data)
+	log.Printf("\033[33mNode: Sending MainMessage to address: %d from node: %d with payload: %x\033[0m", address, n.address, data)
 	err = n.tcpMessageSender.SendMsgToAddress(address, data, n.address)
 	if err != nil {
-		return fmt.Errorf("Node: failed to send message: %v", err)
+		return fmt.Errorf("\033[33mNode: failed to send message: %v\033[0m", err)
 	}
 
 	return nil

@@ -58,6 +58,12 @@ func (f *MessageFactory) CreateBlockMessage(message proto.Message) (*block_chain
 				BlockchainSyncRequest: msg,
 			},
 		}
+	case *block_chain.ApprovedBlock:
+		blockMessage = &block_chain.BlockMessage{
+			BlockMessageType: &block_chain.BlockMessage_ApprovedBlock{
+				ApprovedBlock: msg,
+			},
+		}
 	}
 
 	mainMessage := &block_chain.MainMessage{
