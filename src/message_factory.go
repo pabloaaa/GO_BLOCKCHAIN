@@ -46,12 +46,6 @@ func (f *MessageFactory) CreateBlockMessage(message proto.Message) (*block_chain
 	var blockMessage *block_chain.BlockMessage
 
 	switch msg := message.(type) {
-	case *block_chain.BlocksResponse:
-		blockMessage = &block_chain.BlockMessage{
-			BlockMessageType: &block_chain.BlockMessage_BlocksResponse{
-				BlocksResponse: msg,
-			},
-		}
 	case *block_chain.BlockchainSyncRequest:
 		blockMessage = &block_chain.BlockMessage{
 			BlockMessageType: &block_chain.BlockMessage_BlockchainSyncRequest{
@@ -64,8 +58,19 @@ func (f *MessageFactory) CreateBlockMessage(message proto.Message) (*block_chain
 				ApprovedBlock: msg,
 			},
 		}
+	case *block_chain.BlockResponse:
+		blockMessage = &block_chain.BlockMessage{
+			BlockMessageType: &block_chain.BlockMessage_BlockResponse{
+				BlockResponse: msg,
+			},
+		}
+	case *block_chain.BlockRequest:
+		blockMessage = &block_chain.BlockMessage{
+			BlockMessageType: &block_chain.BlockMessage_BlockRequest{
+				BlockRequest: msg,
+			},
+		}
 	}
-
 	mainMessage := &block_chain.MainMessage{
 		MessageType: &block_chain.MainMessage_BlockMessage{
 			BlockMessage: blockMessage,

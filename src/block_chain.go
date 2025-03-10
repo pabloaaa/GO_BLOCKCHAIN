@@ -62,8 +62,6 @@ func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) erro
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
 
-	log.Printf("block_chain: Attempting to add block with index %d", block.Index)
-
 	// Check if a block with the same index already exists
 	existingBlockNode := bc.GetBlockByIndex(block.Index)
 	if existingBlockNode != nil {
@@ -99,7 +97,6 @@ func (bc *Blockchain) ApproveBlock(blockNode *types.BlockNode) {
 	} else {
 		blockNode.Block.Checkpoint = false
 	}
-	log.Printf("block_chain: ApproveBlock called for block index %d, Checkpoint: %t", blockNode.Block.Index, blockNode.Block.Checkpoint)
 }
 
 // ValidateBlock validates a block against its parent block.
@@ -117,7 +114,6 @@ func (bc *Blockchain) ValidateBlock(block *types.Block, parentBlock *types.Block
 		return errors.New("Block hash is not valid")
 	}
 
-	log.Printf("block_chain: Block validated successfully for block index %d", block.Index)
 	return nil
 }
 
@@ -194,14 +190,25 @@ func (bc *Blockchain) GetBlockByIndex(index uint64) *types.BlockNode {
 	return foundNode
 }
 
-// GetLatestBlock returns the latest block in the blockchain.
+// GetLatestBlock returns the latest approved block or the block with the highest index if no approved block exists.
 func (bc *Blockchain) GetLatestBlock() *types.Block {
-	var latestBlock *types.Block
+	latestBlock := bc.GetLatestApprovedBlock()
+	if latestBlock == nil {
+		latestBlock = bc.getBlockWithHighestIndex()
+	}
+	return latestBlock
+}
+
+// getBlockWithHighestIndex returns the block with the highest index.
+func (bc *Blockchain) getBlockWithHighestIndex() *types.Block {
+	var highestBlock *types.Block
 	bc.TraverseTree(func(node *types.BlockNode) bool {
-		latestBlock = node.Block
+		if highestBlock == nil || node.Block.Index > highestBlock.Index {
+			highestBlock = node.Block
+		}
 		return false
 	})
-	return latestBlock
+	return highestBlock
 }
 
 // GetLatestApprovedBlock returns the latest approved block in the blockchain.

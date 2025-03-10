@@ -31,7 +31,7 @@ func PrepareProtoMessageToSend(factory *MessageFactory, message proto.Message) (
 	switch message.(type) {
 	case *block_chain.WelcomeRequest, *block_chain.WelcomeResponse:
 		mainMessage, err = factory.CreateNodeMessage(message)
-	case *block_chain.BlocksResponse, *block_chain.BlockchainSyncRequest, *block_chain.ApprovedBlock:
+	case *block_chain.BlockResponse, *block_chain.BlockchainSyncRequest, *block_chain.ApprovedBlock, *block_chain.BlockRequest:
 		mainMessage, err = factory.CreateBlockMessage(message)
 	}
 

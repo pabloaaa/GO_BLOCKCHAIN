@@ -43,7 +43,6 @@ func NewNode(blockchain interfaces.BlockchainInterface, address int, tcpMessageS
 	// If bootstrapAddress is provided and not the same as node address, add it to the list of nodes
 	if bootstrapAddress > 0 && bootstrapAddress != address {
 		node.nodes = append(node.nodes, bootstrapAddress)
-		node.tcpConnectionManager.ConnectToNode(bootstrapAddress)
 	}
 
 	log.Printf("\033[33mNode: Node initialized with address: %d and bootstrap address: %d\033[0m", address, bootstrapAddress)
@@ -87,6 +86,7 @@ func (n *Node) Start() {
 	}
 
 	for {
+		log.Printf("\033[33mNode: Waiting for incoming connections...\033[0m")
 		conn, err := ln.Accept()
 		if err != nil {
 			log.Fatalf("\033[33mNode: Failed to accept connection: %v\033[0m", err)
@@ -98,31 +98,37 @@ func (n *Node) Start() {
 
 // handleConnection handles an incoming connection.
 func (n *Node) handleConnection(conn net.Conn) {
-	defer conn.Close()
+	for {
+		buf := make([]byte, 4096)
+		nRead, err := conn.Read(buf)
+		if err != nil {
+			log.Println("\033[33mNode: Error reading from connection: \033[0m", err)
+			conn.Close()
+			return
+		}
 
-	buf := make([]byte, 4096)
-	nRead, err := conn.Read(buf)
-	if err != nil {
-		log.Println("\033[33mNode: Error reading from connection: \033[0m", err)
-		return
-	}
+		var mainMessage block_chain.MainMessage
+		err = proto.Unmarshal(buf[:nRead], &mainMessage)
+		if err != nil {
+			log.Printf("\033[33mNode: Failed to unmarshal main message: %v\033[0m", err)
+			conn.Close()
+			return
+		}
 
-	var mainMessage block_chain.MainMessage
-	err = proto.Unmarshal(buf[:nRead], &mainMessage)
-	if err != nil {
-		log.Printf("\033[33mNode: Failed to unmarshal main message: %v\033[0m", err)
-		return
-	}
+		log.Printf("\033[33mNode: Received message of type %T\033[0m", mainMessage.MessageType)
 
-	switch msg := mainMessage.MessageType.(type) {
-	case *block_chain.MainMessage_BlockMessage:
-		log.Printf("\033[33mNode: Received block message\033[0m")
-		n.blockHandler.HandleBlockMessage(msg.BlockMessage)
-	case *block_chain.MainMessage_NodeMessage:
-		log.Printf("\033[33mNode: Received node message\033[0m")
-		n.nodeHandler.HandleNodeMessage(msg.NodeMessage)
-	default:
-		log.Printf("\033[33mNode: Unknown message type: %T\033[0m", msg)
+		switch msg := mainMessage.MessageType.(type) {
+		case *block_chain.MainMessage_BlockMessage:
+			log.Printf("\033[33mNode: Handling BlockMessage\033[0m")
+			n.blockHandler.HandleBlockMessage(msg.BlockMessage)
+		case *block_chain.MainMessage_NodeMessage:
+			log.Printf("\033[33mNode: Handling NodeMessage\033[0m")
+			n.nodeHandler.HandleNodeMessage(msg.NodeMessage)
+		default:
+			log.Printf("\033[33mNode: Unknown message type: %T\033[0m", msg)
+			conn.Close()
+			return
+		}
 	}
 }
 
@@ -193,45 +199,13 @@ func (n *Node) TryToFindNewBlock() {
 	n.mux.Unlock() // Unlock the mutex after adding the block
 }
 
+// SyncNodes synchronizes the node with another node.
 func (n *Node) SyncNodes(address int) error {
 	log.Printf("\033[33mNode: Synchronizing with node at address: %d from node: %d\033[0m", address, n.address)
-	latestBlockHash := n.blockchain.GetLatestApprovedBlock().CalculateHash()
-	mainMessage := &block_chain.MainMessage{
-		MessageType: &block_chain.MainMessage_BlockMessage{
-			BlockMessage: &block_chain.BlockMessage{
-				BlockMessageType: &block_chain.BlockMessage_BlockchainSyncRequest{
-					BlockchainSyncRequest: &block_chain.BlockchainSyncRequest{
-						Hash:          latestBlockHash,
-						SenderAddress: []byte(fmt.Sprintf("%d", n.address)),
-					},
-				},
-			},
-		},
-	}
-	log.Printf("\033[33mNode: Created BlockMessage_BlockchainSyncRequest: %v\033[0m", mainMessage)
-
-	data, err := EncodeMessage(mainMessage)
-	if err != nil {
-		return fmt.Errorf("\033[33mNode: failed to marshal MainMessage: %v\033[0m", err)
-	}
-
-	if len(data) == 0 {
-		log.Println("\033[33mNode: Encoded data is empty\033[0m")
-	} else {
-		log.Printf("\033[33mNode: Encoded MainMessage: %x\033[0m", data)
-	}
-
-	// Send the message to the other node
-	log.Printf("\033[33mNode: Sending MainMessage to address: %d from node: %d with payload: %x\033[0m", address, n.address, data)
-	err = n.tcpMessageSender.SendMsgToAddress(address, data, n.address)
-	if err != nil {
-		return fmt.Errorf("\033[33mNode: failed to send message: %v\033[0m", err)
-	}
-
-	return nil
+	return n.nodeHandler.SyncNodes(address)
 }
 
 // GetPortMap returns the port map from TcpConnectionManager.
-func (n *Node) GetPortMap() map[int]map[int]net.Conn {
+func (n *Node) GetPortMap() map[int]net.Conn {
 	return n.tcpConnectionManager.GetPortMap()
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pabloaaa/GO_BLOCKCHAIN/src"
@@ -71,15 +72,28 @@ func main() {
 func syncNodes(c *gin.Context) {
 	otherNodeAddress := c.Query("address")
 	if otherNodeAddress == "" {
+		log.Println("server: Address query parameter is missing")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "address query parameter is required"})
 		return
 	}
 
-	otherNodePort, _ := strconv.Atoi(otherNodeAddress)
+	// Extract the port from the address
+	parts := strings.Split(otherNodeAddress, ":")
+	if len(parts) != 2 {
+		log.Println("server: Invalid address format")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid address format"})
+		return
+	}
+	otherNodePort, err := strconv.Atoi(parts[1])
+	if err != nil {
+		log.Println("server: Invalid port")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid port"})
+		return
+	}
 
 	log.Printf("server: Starting synchronization with node: %d from node: %d", otherNodePort, node.GetAddress())
 
-	err := node.SyncNodes(otherNodePort)
+	err = node.SyncNodes(otherNodePort)
 	if err != nil {
 		log.Printf("server: Failed to synchronize nodes: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to synchronize nodes"})
@@ -119,16 +133,12 @@ func getStatus(c *gin.Context) {
 	// Dodaj informacje z TcpConnectionManager
 	html += "<h2>Connection Manager Status:</h2>"
 	html += "<h3>Port Map:</h3><ul>"
-	for listeningPort, sendingPorts := range node.GetPortMap() {
-		html += fmt.Sprintf("<li>Listening Port: %d<ul>", listeningPort)
-		for sendingPort, conn := range sendingPorts {
-			status := "inactive"
-			if conn != nil {
-				status = "active"
-			}
-			html += fmt.Sprintf("<li>Sending Port: %d, Status: %s</li>", sendingPort, status)
+	for port, conn := range node.GetPortMap() {
+		status := "inactive"
+		if conn != nil {
+			status = "active"
 		}
-		html += "</ul></li>"
+		html += fmt.Sprintf("<li>Port: %d, Status: %s</li>", port, status)
 	}
 	html += "</ul>"
 

@@ -16,11 +16,9 @@ message MainMessage {
 message BlockMessage {
   oneof block_message_type {
     BlockResponse block_response = 1;
-    BlocksResponse blocks_response = 2;
+    BlockRequest block_request = 2;
     BlockchainSyncRequest blockchain_sync_request = 3;
-    GetLatestBlockRequest get_latest_block_request = 4;
-    Empty empty = 5;
-    ApprovedBlock approved_block = 6;
+    ApprovedBlock approved_block = 4;
   }
 }
 
@@ -29,8 +27,6 @@ message NodeMessage {
   oneof node_message_type {
     WelcomeRequest welcome_request = 1;
     WelcomeResponse welcome_response = 2;
-    PongResponse pong_response = 3;
-    Empty empty = 4;
   }
 }
 
@@ -66,27 +62,23 @@ message Transaction {
 }
 
 message BlockResponse {
-  bool success = 1;
-  bytes message = 2;
-  Block block = 3;
+  Block block = 1;
+  bytes sender_address =2;
 }
 
-message BlocksResponse {
-  repeated Block blocks = 1;
-}
-
-message GetLatestBlockRequest {
-  Empty empty = 1;
+message BlockRequest {
+  uint64 index = 1;
+  bytes hash = 2;
+  bytes sender_address = 3;
 }
 
 message BlockchainSyncRequest {
-  bytes hash = 1;
   bytes sender_address = 2;
 }
 
 message ApprovedBlock {
   Block block = 1;
-  bytes address = 2;
+  bytes sender_address = 2;
 }
 
 /******************************** BLOCK MESSAGES */
