@@ -2,7 +2,6 @@ package src
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"sync"
@@ -27,7 +26,7 @@ type Node struct {
 
 // NewNode creates a new Node.
 func NewNode(blockchain interfaces.BlockchainInterface, address int, tcpMessageSender *TcpMessageSender, bootstrapAddress int) *Node {
-	log.Printf("\033[33mNode: Initializing node with address: %d\033[0m", address)
+	Info(fmt.Sprintf("Node: Initializing node with address: %d", address))
 
 	connectionManager := NewTcpConnectionManager(address)
 	node := &Node{
@@ -44,8 +43,6 @@ func NewNode(blockchain interfaces.BlockchainInterface, address int, tcpMessageS
 	if bootstrapAddress > 0 && bootstrapAddress != address {
 		node.nodes = append(node.nodes, bootstrapAddress)
 	}
-
-	log.Printf("\033[33mNode: Node initialized with address: %d and bootstrap address: %d\033[0m", address, bootstrapAddress)
 	return node
 }
 
@@ -71,27 +68,28 @@ func (n *Node) GetMessageSender() *TcpMessageSender {
 
 // Start starts the node and listens for incoming connections.
 func (n *Node) Start() {
-	log.Printf("\033[33mNode: Node starting on address: %d\033[0m", n.address)
 
 	ln, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", n.address))
 	if err != nil {
-		log.Fatalf("\033[33mNode: Failed to listen on address %d: %v\033[0m", n.address, err)
+		Error(fmt.Sprintf("Node: Failed to listen on address %d: %v", n.address, err))
+		return
 	}
 	defer ln.Close()
 
 	// Check if node.address is not equal to bootstrapAddress
 	if len(n.nodes) > 0 && n.nodes[0] != n.address {
-		log.Printf("\033[33mNode: Broadcasting address to nodes: %v\033[0m", n.nodes)
+		Debug(fmt.Sprintf("Node: Broadcasting address to nodes: %v", n.nodes))
 		n.nodeHandler.BroadcastAddress(n.nodes, n.address)
 	}
 
 	for {
-		log.Printf("\033[33mNode: Waiting for incoming connections...\033[0m")
+		Debug("Node: Waiting for incoming connections...")
 		conn, err := ln.Accept()
 		if err != nil {
-			log.Fatalf("\033[33mNode: Failed to accept connection: %v\033[0m", err)
+			Error(fmt.Sprintf("Node: Failed to accept connection: %v", err))
+			return
 		}
-		log.Printf("\033[33mNode: Accepted connection from: %s\033[0m", conn.RemoteAddr().String())
+		Debug(fmt.Sprintf("Node: Accepted connection from: %s", conn.RemoteAddr().String()))
 		go n.handleConnection(conn)
 	}
 }
@@ -102,7 +100,7 @@ func (n *Node) handleConnection(conn net.Conn) {
 		buf := make([]byte, 4096)
 		nRead, err := conn.Read(buf)
 		if err != nil {
-			log.Println("\033[33mNode: Error reading from connection: \033[0m", err)
+			Debug(fmt.Sprintf("Node: Error reading from connection: %v", err))
 			conn.Close()
 			return
 		}
@@ -110,22 +108,22 @@ func (n *Node) handleConnection(conn net.Conn) {
 		var mainMessage block_chain.MainMessage
 		err = proto.Unmarshal(buf[:nRead], &mainMessage)
 		if err != nil {
-			log.Printf("\033[33mNode: Failed to unmarshal main message: %v\033[0m", err)
+			Error(fmt.Sprintf("Node: Failed to unmarshal main message: %v", err))
 			conn.Close()
 			return
 		}
 
-		log.Printf("\033[33mNode: Received message of type %T\033[0m", mainMessage.MessageType)
+		Debug(fmt.Sprintf("Node: Received message of type %T", mainMessage.MessageType))
 
 		switch msg := mainMessage.MessageType.(type) {
 		case *block_chain.MainMessage_BlockMessage:
-			log.Printf("\033[33mNode: Handling BlockMessage\033[0m")
+			Debug("Node: Handling BlockMessage")
 			n.blockHandler.HandleBlockMessage(msg.BlockMessage)
 		case *block_chain.MainMessage_NodeMessage:
-			log.Printf("\033[33mNode: Handling NodeMessage\033[0m")
+			Debug("Node: Handling NodeMessage")
 			n.nodeHandler.HandleNodeMessage(msg.NodeMessage)
 		default:
-			log.Printf("\033[33mNode: Unknown message type: %T\033[0m", msg)
+			Error(fmt.Sprintf("Node: Unknown message type: %T", msg))
 			conn.Close()
 			return
 		}
@@ -147,13 +145,13 @@ func (n *Node) getRandomNodes(count int) []int {
 
 // TryToFindNewBlock attempts to find a new block.
 func (n *Node) TryToFindNewBlock() {
-	log.Println("\033[33mNode: Starting to find a new block...\033[0m")
+	Debug("Node: Starting to find a new block...")
 
 	n.mux.Lock() // Lock the mutex before generating the new block
 
 	// Get the latest approved block or the latest block if no approved block exists
 	parentBlock := n.blockchain.GetLatestBlock()
-	log.Printf("\033[33mNode: Latest block index: %d\033[0m", parentBlock.Index)
+	Debug(fmt.Sprintf("Node: Latest block index: %d", parentBlock.Index))
 
 	// Generate a new block with the correct index
 	transaction := []types.Transaction{
@@ -176,22 +174,22 @@ func (n *Node) TryToFindNewBlock() {
 	// Add the new block to the blockchain
 	latestBlockNode := n.blockchain.GetBlock(parentBlock.CalculateHash())
 	if latestBlockNode == nil {
-		log.Printf("\033[33mNode: Failed to find the latest block node\033[0m")
+		Error("Node: Failed to find the latest block node")
 		n.mux.Unlock()
 		return
 	}
 
-	log.Printf("\033[33mNode: Attempting to add block with index %d\033[0m", newBlock.Index)
+	Debug(fmt.Sprintf("Node: Attempting to add block with index %d", newBlock.Index))
 	err := n.blockchain.AddBlock(latestBlockNode, newBlock)
 	if err != nil {
-		log.Printf("\033[33mNode: Failed to add block: %v\033[0m", err)
+		Error(fmt.Sprintf("Node: Failed to add block: %v", err))
 		n.mux.Unlock()
 		return
 	} else {
-		log.Printf("\033[33mNode: Block with index %d added successfully\033[0m", newBlock.Index)
+		Debug(fmt.Sprintf("Node: Block with index %d added successfully", newBlock.Index))
 		// Broadcast the new block to other nodes if it has a checkpoint
 		if newBlock.Checkpoint {
-			log.Println("\033[33mNode: Broadcasting latest block to nodes\033[0m")
+			Debug("Node: Broadcasting latest block to nodes")
 			n.blockHandler.BroadcastApprovedBlock(newBlock, n.nodes)
 		}
 	}
@@ -201,7 +199,7 @@ func (n *Node) TryToFindNewBlock() {
 
 // SyncNodes synchronizes the node with another node.
 func (n *Node) SyncNodes(address int) error {
-	log.Printf("\033[33mNode: Synchronizing with node at address: %d from node: %d\033[0m", address, n.address)
+	Debug(fmt.Sprintf("Node: Synchronizing with node at address: %d from node: %d", address, n.address))
 	return n.nodeHandler.SyncNodes(address)
 }
 

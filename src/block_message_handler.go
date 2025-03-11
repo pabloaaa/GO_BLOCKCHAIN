@@ -1,10 +1,9 @@
 package src
 
 import (
-	"log"
-	"strconv"
-
+	"fmt"
 	"sort"
+	"strconv"
 
 	"github.com/pabloaaa/GO_BLOCKCHAIN/interfaces"
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
@@ -33,29 +32,29 @@ func NewBlockMessageHandler(blockchain interfaces.BlockchainInterface, messageSe
 
 // HandleBlockMessage processes incoming block messages.
 func (h *BlockMessageHandlerImpl) HandleBlockMessage(msg *block_chain.BlockMessage) {
-	log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Received BlockMessage of type %T\033[0m", h.localPort, msg.BlockMessageType)
+	Info(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Received BlockMessage of type %T", h.localPort, msg.BlockMessageType))
 	switch blockMsg := msg.BlockMessageType.(type) {
 	case *block_chain.BlockMessage_BlockchainSyncRequest:
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Handling BlockchainSyncRequest\033[0m", h.localPort)
+		Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Handling BlockchainSyncRequest", h.localPort))
 		h.handleBlockchainSyncRequest(blockMsg.BlockchainSyncRequest)
 	case *block_chain.BlockMessage_ApprovedBlock:
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Handling ApprovedBlock\033[0m", h.localPort)
+		Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Handling ApprovedBlock", h.localPort))
 		h.handleApprovedBlock(blockMsg.ApprovedBlock)
 	case *block_chain.BlockMessage_BlockResponse:
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Handling BlockResponse\033[0m", h.localPort)
+		Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Handling BlockResponse", h.localPort))
 		h.handleBlockResponse(blockMsg.BlockResponse)
 	case *block_chain.BlockMessage_BlockRequest:
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Handling BlockRequest\033[0m", h.localPort)
+		Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Handling BlockRequest", h.localPort))
 		h.handleBlockRequest(blockMsg.BlockRequest)
 	default:
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Unknown BlockMessageType: %T\033[0m", h.localPort, blockMsg)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Unknown BlockMessageType: %T", h.localPort, blockMsg))
 	}
 }
 
 // handleBlockchainSyncRequest processes a blockchain sync request.
 func (h *BlockMessageHandlerImpl) handleBlockchainSyncRequest(blockChainSyncRequest *block_chain.BlockchainSyncRequest) {
 	bestBlock := h.blockchain.GetLatestBlock()
-	log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Best block index: %d\033[0m", h.localPort, bestBlock.Index)
+	Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Best block index: %d", h.localPort, bestBlock.Index))
 
 	// Create a BlockResponse for the found block
 	blockResponse := &block_chain.BlockResponse{
@@ -64,61 +63,46 @@ func (h *BlockMessageHandlerImpl) handleBlockchainSyncRequest(blockChainSyncRequ
 	}
 
 	if blockResponse.Block == nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: blockResponse.Block is nil after conversion to proto\033[0m", h.localPort)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: blockResponse.Block is nil after conversion to proto", h.localPort))
 		return
 	}
 
 	// Prepare message to send
 	data, err := PrepareProtoMessageToSend(h.factory, blockResponse)
 	if err != nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Failed to encode BlockResponse: %v\033[0m", h.localPort, err)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Failed to encode BlockResponse: %v", h.localPort, err))
 		return
 	}
 
 	// Log the serialized data for debugging
-	log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Serialized BlockResponse data: %x\033[0m", h.localPort, data)
+	Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Serialized BlockResponse data: %x", h.localPort, data))
 
 	// Send BlockResponse message to sender
 	senderAddress, _ := strconv.Atoi(string(blockChainSyncRequest.SenderAddress))
-	log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Sending BlockResponse to address %d\033[0m", h.localPort, senderAddress)
+	Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Sending BlockResponse to address %d", h.localPort, senderAddress))
 	err = h.messageSender.SendMsgToAddress(senderAddress, data)
 	if err != nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Failed to send BlockResponse: %v\033[0m", h.localPort, err)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Failed to send BlockResponse: %v", h.localPort, err))
 	} else {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Successfully sent BlockResponse\033[0m", h.localPort)
+		Info(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Successfully sent BlockResponse", h.localPort))
 	}
 }
 
 func (h *BlockMessageHandlerImpl) handleBlockResponse(blockResponse *block_chain.BlockResponse) {
-	if blockResponse == nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: blockResponse is nil\033[0m", h.localPort)
-		return
-	}
-	if blockResponse.Block == nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: blockResponse.Block is nil\033[0m", h.localPort)
-		return
-	}
-	if blockResponse.SenderAddress == nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: blockResponse.SenderAddress is nil\033[0m", h.localPort)
-		return
-	}
-	log.Printf("\033[34mBlockMessageHandlerImpl[%d]: blockResponse.Block.Index: %d\033[0m", h.localPort, blockResponse.Block.Index)
-	log.Printf("\033[34mBlockMessageHandlerImpl[%d]: blockResponse.SenderAddress: %s\033[0m", h.localPort, string(blockResponse.SenderAddress))
-
 	block := types.BlockFromProto(blockResponse.Block)
 	if block == nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: block is nil after conversion from proto\033[0m", h.localPort)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: block is nil after conversion from proto", h.localPort))
 		return
 	}
 	blockHash := block.CalculateHash()
-	log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Calculated block hash: %x\033[0m", h.localPort, blockHash)
+	Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Calculated block hash: %x", h.localPort, blockHash))
 	blockNode := h.blockchain.GetBlock(blockHash)
 	if blockNode != nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Block with hash %x found\033[0m", h.localPort, blockHash)
+		Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Block with hash %x found", h.localPort, blockHash))
 		// Add all blocks from temporaryBlockChain for the given node port in the correct order
 		senderAddress, err := strconv.Atoi(string(blockResponse.SenderAddress))
 		if err != nil {
-			log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Error converting sender address %s to int: %v\033[0m", h.localPort, blockResponse.SenderAddress, err)
+			Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Error converting sender address %s to int: %v", h.localPort, blockResponse.SenderAddress, err))
 			return
 		}
 		if blocks, exists := h.temporaryBlockChain[senderAddress]; exists {
@@ -133,12 +117,12 @@ func (h *BlockMessageHandlerImpl) handleBlockResponse(blockResponse *block_chain
 				if parentBlockNode != nil {
 					err := h.blockchain.AddBlock(parentBlockNode, tempBlock)
 					if err != nil {
-						log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Failed to add block with index %d: %v\033[0m", h.localPort, tempBlock.Index, err)
+						Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Failed to add block with index %d: %v", h.localPort, tempBlock.Index, err))
 					} else {
-						log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Added block with index %d from temporaryBlockChain\033[0m", h.localPort, tempBlock.Index)
+						Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Added block with index %d from temporaryBlockChain", h.localPort, tempBlock.Index))
 					}
 				} else {
-					log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Parent block not found for block with index %d\033[0m", h.localPort, tempBlock.Index)
+					Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Parent block not found for block with index %d", h.localPort, tempBlock.Index))
 				}
 			}
 			delete(h.temporaryBlockChain, senderAddress)
@@ -149,38 +133,38 @@ func (h *BlockMessageHandlerImpl) handleBlockResponse(blockResponse *block_chain
 	// Add the block to the temporaryBlockChain
 	senderAddress, err := strconv.Atoi(string(blockResponse.SenderAddress))
 	if err != nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Error converting sender address %s to int: %v\033[0m", h.localPort, blockResponse.SenderAddress, err)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Error converting sender address %s to int: %v", h.localPort, blockResponse.SenderAddress, err))
 		return
 	}
 	if _, exists := h.temporaryBlockChain[senderAddress]; !exists {
 		h.temporaryBlockChain[senderAddress] = make(map[uint64]*types.Block)
 	}
 	h.temporaryBlockChain[senderAddress][block.Index] = block
-	log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Added block with index %d to temporaryBlockChain\033[0m", h.localPort, block.Index)
+	Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Added block with index %d to temporaryBlockChain", h.localPort, block.Index))
 
 	blockRequest := &block_chain.BlockRequest{
 		Index:         block.Index - 1,
 		SenderAddress: []byte(strconv.Itoa(h.localPort)),
 	}
-	log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Sending BlockRequest for block index %d\033[0m", h.localPort, block.Index-1)
+	Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Sending BlockRequest for block index %d", h.localPort, block.Index-1))
 	// Prepare message to send
 	data, err := PrepareProtoMessageToSend(h.factory, blockRequest)
 	if err != nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Failed to encode BlockRequest: %v\033[0m", h.localPort, err)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Failed to encode BlockRequest: %v", h.localPort, err))
 		return
 	}
 
 	// Send BlockRequest message to sender
 	err = h.messageSender.SendMsgToAddress(senderAddress, data)
 	if err != nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Failed to send BlockRequest: %v\033[0m", h.localPort, err)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Failed to send BlockRequest: %v", h.localPort, err))
 	} else {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Successfully sent BlockRequest\033[0m", h.localPort)
+		Info(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Successfully sent BlockRequest", h.localPort))
 	}
 }
 
 func (h *BlockMessageHandlerImpl) handleApprovedBlock(approvedBlock *block_chain.ApprovedBlock) {
-	log.Printf("\033[34mBlockMessageHandlerImpl[%d]: handleApprovedBlock called for block index %d\033[0m", h.localPort, approvedBlock.Block.Index)
+	Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: handleApprovedBlock called for block index %d", h.localPort, approvedBlock.Block.Index))
 
 	senderAddress, _ := strconv.Atoi(string(approvedBlock.SenderAddress))
 	blockchainSyncRequest := &block_chain.BlockchainSyncRequest{
@@ -190,16 +174,16 @@ func (h *BlockMessageHandlerImpl) handleApprovedBlock(approvedBlock *block_chain
 	// Prepare message to send
 	data, err := PrepareProtoMessageToSend(h.factory, blockchainSyncRequest)
 	if err != nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Failed to encode BlockchainSyncRequest: %v\033[0m", h.localPort, err)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Failed to encode BlockchainSyncRequest: %v", h.localPort, err))
 		return
 	}
 
 	// Send BlockchainSyncRequest message to sender
 	err = h.messageSender.SendMsgToAddress(senderAddress, data)
 	if err != nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Failed to send BlockchainSyncRequest: %v\033[0m", h.localPort, err)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Failed to send BlockchainSyncRequest: %v", h.localPort, err))
 	} else {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Successfully sent BlockchainSyncRequest\033[0m", h.localPort)
+		Info(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Successfully sent BlockchainSyncRequest", h.localPort))
 	}
 }
 
@@ -213,26 +197,26 @@ func (h *BlockMessageHandlerImpl) BroadcastApprovedBlock(block *types.Block, nod
 	// Prepare message to send
 	data, err := PrepareProtoMessageToSend(h.factory, approvedBlockMessage)
 	if err != nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Failed to encode ApprovedBlock message: %v\033[0m", h.localPort, err)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Failed to encode ApprovedBlock message: %v", h.localPort, err))
 		return
 	}
 
 	for _, nodeAddress := range nodes {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Sending ApprovedBlock to node %d\033[0m", h.localPort, nodeAddress)
+		Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Sending ApprovedBlock to node %d", h.localPort, nodeAddress))
 		err = h.messageSender.SendMsgToAddress(nodeAddress, data)
 		if err != nil {
-			log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Failed to send ApprovedBlock message to node %d: %v\033[0m", h.localPort, nodeAddress, err)
+			Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Failed to send ApprovedBlock message to node %d: %v", h.localPort, nodeAddress, err))
 		} else {
-			log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Successfully sent ApprovedBlock message to node %d\033[0m", h.localPort, nodeAddress)
+			Info(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Successfully sent ApprovedBlock message to node %d", h.localPort, nodeAddress))
 		}
 	}
 }
 
 func (h *BlockMessageHandlerImpl) handleBlockRequest(blockRequest *block_chain.BlockRequest) {
-	log.Printf("\033[34mBlockMessageHandlerImpl[%d]: handleBlockRequest called for block index %d\033[0m", h.localPort, blockRequest.Index)
+	Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: handleBlockRequest called for block index %d", h.localPort, blockRequest.Index))
 	blockNode := h.blockchain.GetBlockByIndex(blockRequest.Index)
 	if blockNode == nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Block with index %d not found\033[0m", h.localPort, blockRequest.Index)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Block with index %d not found", h.localPort, blockRequest.Index))
 		return
 	}
 
@@ -245,17 +229,17 @@ func (h *BlockMessageHandlerImpl) handleBlockRequest(blockRequest *block_chain.B
 	// Prepare message to send
 	data, err := PrepareProtoMessageToSend(h.factory, blockResponse)
 	if err != nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Failed to encode BlockResponse: %v\033[0m", h.localPort, err)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Failed to encode BlockResponse: %v", h.localPort, err))
 		return
 	}
 
 	// Send BlockResponse message to sender
 	senderAddress, _ := strconv.Atoi(string(blockRequest.SenderAddress))
-	log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Sending BlockResponse to address %d\033[0m", h.localPort, senderAddress)
+	Debug(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Sending BlockResponse to address %d", h.localPort, senderAddress))
 	err = h.messageSender.SendMsgToAddress(senderAddress, data)
 	if err != nil {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Failed to send BlockResponse: %v\033[0m", h.localPort, err)
+		Error(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Failed to send BlockResponse: %v", h.localPort, err))
 	} else {
-		log.Printf("\033[34mBlockMessageHandlerImpl[%d]: Successfully sent BlockResponse\033[0m", h.localPort)
+		Info(fmt.Sprintf("BlockMessageHandlerImpl[%d]: Successfully sent BlockResponse", h.localPort))
 	}
 }

@@ -86,13 +86,16 @@ func extractNodes(htmlBody string) ([]string, error) {
 	return nodes, nil
 }
 
-func startNode(port, httpPort, bootstrapPort int) {
+func startNode(port, httpPort, bootstrapPort int, logLevel string) {
 	go func() {
-		mainWithArgs(port, httpPort, bootstrapPort)
+		mainWithArgs(port, httpPort, bootstrapPort, logLevel)
 	}()
 }
 
-func mainWithArgs(port, httpPort, bootstrapPort int) {
+func mainWithArgs(port, httpPort, bootstrapPort int, logLevel string) {
+	// Ustaw poziom logowania
+	src.SetLogLevel(logLevel)
+
 	// Initialize blockchain
 	blockchain := src.NewBlockchain()
 
@@ -190,14 +193,14 @@ func TestNodeWelcomeMessage(t *testing.T) {
 	clearAllPorts()
 	defer clearAllPorts() // Ensure ports are cleared after the test
 
-	// Start three nodes
-	startNode(50001, 60001, 50001)
+	// Start three nodes with default log level (info)
+	startNode(50001, 60001, 50001, "info")
 	time.Sleep(1 * time.Second) // Wait for the first node to start
 
-	startNode(50002, 60002, 50001)
+	startNode(50002, 60002, 50001, "info")
 	time.Sleep(1 * time.Second) // Wait for the second node to start
 
-	startNode(50003, 60003, 50001)
+	startNode(50003, 60003, 50001, "info")
 	time.Sleep(1 * time.Second) // Wait for the third node to start
 
 	// Wait for nodes to fully initialize
@@ -250,11 +253,11 @@ func TestNodeSynchronization(t *testing.T) {
 	clearAllPorts()
 	defer clearAllPorts() // Ensure ports are cleared after the test
 
-	// Start two nodes
-	startNode(50001, 60001, 50001)
+	// Start two nodes with default log level (info)
+	startNode(50001, 60001, 50001, "info")
 	time.Sleep(1 * time.Second) // Wait for the first node to start
 
-	startNode(50002, 60002, 50001)
+	startNode(50002, 60002, 50001, "info")
 	time.Sleep(1 * time.Second) // Wait for the second node to start
 
 	// Create two new blocks on the first node
@@ -303,11 +306,11 @@ func TestAddTenBlocksAndSync(t *testing.T) {
 	clearAllPorts()
 	defer clearAllPorts() // Ensure ports are cleared after the test
 
-	// Start two nodes
-	startNode(50001, 60001, 50001)
+	// Start two nodes with default log level (info)
+	startNode(50001, 60001, 50001, "debug")
 	time.Sleep(1 * time.Second) // Wait for the first node to start
 
-	startNode(50002, 60002, 50001)
+	startNode(50002, 60002, 50001, "debug")
 	time.Sleep(1 * time.Second) // Wait for the second node to start
 
 	// Create ten new blocks on the first node
@@ -319,7 +322,7 @@ func TestAddTenBlocksAndSync(t *testing.T) {
 	}
 
 	// Wait for a while to ensure blocks are created
-	time.Sleep(2 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// Check the status of both nodes
 	status1, err := http.Get("http://localhost:60001/status")
@@ -351,14 +354,14 @@ func TestThreeNodesAddBlocksAndSync(t *testing.T) {
 	clearAllPorts()
 	defer clearAllPorts() // Ensure ports are cleared after the test
 
-	// Start three nodes
-	startNode(50001, 60001, 50001)
+	// Start three nodes with default log level (info)
+	startNode(50001, 60001, 50001, "info")
 	time.Sleep(1 * time.Second) // Wait for the first node to start
 
-	startNode(50002, 60002, 50001)
+	startNode(50002, 60002, 50001, "info")
 	time.Sleep(1 * time.Second) // Wait for the second node to start
 
-	startNode(50003, 60003, 50001)
+	startNode(50003, 60003, 50001, "info")
 	time.Sleep(1 * time.Second) // Wait for the third node to start
 
 	// Create ten new blocks on the first node
@@ -366,11 +369,11 @@ func TestThreeNodesAddBlocksAndSync(t *testing.T) {
 		resp, err := http.Post("http://localhost:60001/find_new_block", "application/json", nil)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		time.Sleep(1 * time.Second) // Wait for the block to be created
+		time.Sleep(2 * time.Second) // Wait for the block to be created
 	}
 
 	// Wait for a while to ensure blocks are created
-	time.Sleep(2 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// Check the status of all nodes
 	status1, err := http.Get("http://localhost:60001/status")

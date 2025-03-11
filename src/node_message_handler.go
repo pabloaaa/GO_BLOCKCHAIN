@@ -1,7 +1,7 @@
 package src
 
 import (
-	"log"
+	"fmt"
 	"strconv"
 
 	"github.com/pabloaaa/GO_BLOCKCHAIN/interfaces"
@@ -28,23 +28,23 @@ func NewNodeMessageHandler(messageSender interfaces.MessageSender, nodesAddresse
 
 // HandleNodeMessage processes incoming node messages.
 func (h *NodeMessageHandlerImpl) HandleNodeMessage(msg *block_chain.NodeMessage) {
-	log.Printf("\033[32mNodeMessageHandlerImpl[%d]: Received node message of type %T\033[0m", h.localPort, msg.NodeMessageType)
+	Debug(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Received node message of type %T", colorGreen, h.localPort, colorReset, msg.NodeMessageType))
 	switch nodeMsg := msg.NodeMessageType.(type) {
 	case *block_chain.NodeMessage_WelcomeRequest:
-		log.Printf("\033[32mNodeMessageHandlerImpl[%d]: Handling WelcomeRequest from %s\033[0m", h.localPort, nodeMsg.WelcomeRequest.SenderAddress)
+		Debug(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Handling WelcomeRequest from %s", colorGreen, h.localPort, colorReset, nodeMsg.WelcomeRequest.SenderAddress))
 		senderPort, _ := strconv.Atoi(string(nodeMsg.WelcomeRequest.SenderAddress))
 		h.handleWelcomeRequest(senderPort)
 	case *block_chain.NodeMessage_WelcomeResponse:
-		log.Printf("\033[32mNodeMessageHandlerImpl[%d]: Handling WelcomeResponse\033[0m", h.localPort)
+		Debug(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Handling WelcomeResponse", colorGreen, h.localPort, colorReset))
 		h.handleWelcomeResponse(nodeMsg.WelcomeResponse.NodeAdresses)
 	default:
-		log.Printf("\033[32mNodeMessageHandlerImpl[%d]: Unknown node message type: %T\033[0m", h.localPort, nodeMsg)
+		Error(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Unknown node message type: %T", colorGreen, h.localPort, colorReset, nodeMsg))
 	}
 }
 
 // handleWelcomeRequest processes a welcome request message.
 func (h *NodeMessageHandlerImpl) handleWelcomeRequest(senderAddress int) {
-	log.Printf("NodeMessageHandlerImpl[%d]: handleWelcomeRequest called with senderAddress: %d", h.localPort, senderAddress)
+	Debug(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: handleWelcomeRequest called with senderAddress: %d", colorGreen, h.localPort, colorReset, senderAddress))
 	// Build WelcomeResponse message
 	nodeAddresses := make([][]byte, len(*h.nodes))
 	for i, node := range *h.nodes {
@@ -57,37 +57,37 @@ func (h *NodeMessageHandlerImpl) handleWelcomeRequest(senderAddress int) {
 	// Prepare message to send
 	data, err := PrepareProtoMessageToSend(h.factory, welcomeResponse)
 	if err != nil {
-		log.Printf("NodeMessageHandlerImpl[%d]: Error preparing proto message: %v", h.localPort, err)
-		log.Fatal(err)
+		Error(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Error preparing proto message: %v", colorGreen, h.localPort, colorReset, err))
+		return
 	}
 
 	// Send WelcomeResponse message to sender
 	err = h.messageSender.SendMsgToAddress(senderAddress, data)
 	if err != nil {
-		log.Printf("NodeMessageHandlerImpl[%d]: Failed to send welcome response to node at address %d: %v", h.localPort, senderAddress, err)
+		Error(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Failed to send welcome response to node at address %d: %v", colorGreen, h.localPort, colorReset, senderAddress, err))
 	} else {
-		log.Printf("NodeMessageHandlerImpl[%d]: Successfully sent welcome response to node at address %d", h.localPort, senderAddress)
+		Info(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Successfully sent welcome response to node at address %d", colorGreen, h.localPort, colorReset, senderAddress))
 	}
 
 	// Add sender address to nodes list if it is not the local address
 	if !containsAddress(*h.nodes, senderAddress) {
 		*h.nodes = append(*h.nodes, senderAddress)
-		log.Printf("NodeMessageHandlerImpl[%d]: Added sender address %d to nodes list", h.localPort, senderAddress)
+		Debug(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Added sender address %d to nodes list", colorGreen, h.localPort, colorReset, senderAddress))
 	}
 }
 
 // handleWelcomeResponse processes a welcome response message.
 func (h *NodeMessageHandlerImpl) handleWelcomeResponse(nodes_addresses [][]byte) {
-	log.Printf("NodeMessageHandlerImpl[%d]: handleWelcomeResponse called with nodes_addresses: %v", h.localPort, nodes_addresses)
+	Debug(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: handleWelcomeResponse called with nodes_addresses: %v", colorGreen, h.localPort, colorReset, nodes_addresses))
 	for _, addr := range nodes_addresses {
 		nodeAddress, err := strconv.Atoi(string(addr))
 		if err != nil {
-			log.Printf("NodeMessageHandlerImpl[%d]: Error converting address %s to int: %v", h.localPort, addr, err)
+			Error(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Error converting address %s to int: %v", colorGreen, h.localPort, colorReset, addr, err))
 			continue
 		}
 		if !containsAddress(*h.nodes, nodeAddress) {
 			*h.nodes = append(*h.nodes, nodeAddress)
-			log.Printf("NodeMessageHandlerImpl[%d]: Added node address %d to nodes list", h.localPort, nodeAddress)
+			Debug(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Added node address %d to nodes list", colorGreen, h.localPort, colorReset, nodeAddress))
 		}
 	}
 }
@@ -95,7 +95,7 @@ func (h *NodeMessageHandlerImpl) handleWelcomeResponse(nodes_addresses [][]byte)
 // BroadcastAddress sends the node's address to all known nodes.
 func (h *NodeMessageHandlerImpl) BroadcastAddress(nodes []int, sender_address int) {
 	for _, node := range nodes {
-		log.Printf("\033[32mNodeMessageHandlerImpl[%d]: Broadcasting address %d to node at address %d\033[0m", h.localPort, sender_address, node)
+		Debug(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Broadcasting address %d to node at address %d", colorGreen, h.localPort, colorReset, sender_address, node))
 		welcomeRequest := &block_chain.WelcomeRequest{
 			SenderAddress: []byte(strconv.Itoa(sender_address)),
 		}
@@ -103,22 +103,23 @@ func (h *NodeMessageHandlerImpl) BroadcastAddress(nodes []int, sender_address in
 		// Prepare message to send
 		data, err := PrepareProtoMessageToSend(h.factory, welcomeRequest)
 		if err != nil {
-			log.Fatal(err)
+			Error(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Error preparing proto message: %v", colorGreen, h.localPort, colorReset, err))
+			return
 		}
 
 		// Send WelcomeRequest message to node
 		err = h.messageSender.SendMsgToAddress(node, data)
 		if err != nil {
-			log.Printf("\033[32mNodeMessageHandlerImpl[%d]: Failed to send message to node at address %d: %v\033[0m", h.localPort, node, err)
+			Error(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Failed to send message to node at address %d: %v", colorGreen, h.localPort, colorReset, node, err))
 		} else {
-			log.Printf("\033[32mNodeMessageHandlerImpl[%d]: Successfully sent welcome request to node at address %d\033[0m", h.localPort, node)
+			Info(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Successfully sent welcome request to node at address %d", colorGreen, h.localPort, colorReset, node))
 		}
 	}
 }
 
 // SyncNodes synchronizes the node with another node.
 func (h *NodeMessageHandlerImpl) SyncNodes(address int) error {
-	log.Printf("NodeMessageHandlerImpl[%d]: Synchronizing with node at address: %d from node: %d", h.localPort, address, h.localPort)
+	Debug(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Synchronizing with node at address: %d from node: %d", colorGreen, h.localPort, colorReset, address, h.localPort))
 
 	blockchainSyncRequest := &block_chain.BlockchainSyncRequest{
 		SenderAddress: []byte(strconv.Itoa(h.localPort)),
@@ -127,17 +128,18 @@ func (h *NodeMessageHandlerImpl) SyncNodes(address int) error {
 	// Prepare message to send
 	data, err := PrepareProtoMessageToSend(h.factory, blockchainSyncRequest)
 	if err != nil {
+		Error(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Error preparing proto message: %v", colorGreen, h.localPort, colorReset, err))
 		return err
 	}
 
 	// Send BlockchainSyncRequest message to sender
-	log.Printf("NodeMessageHandlerImpl[%d]: Sending BlockchainSyncRequest to node at address %d", h.localPort, address)
+	Debug(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Sending BlockchainSyncRequest to node at address %d", colorGreen, h.localPort, colorReset, address))
 	err = h.messageSender.SendMsgToAddress(address, data)
 	if err != nil {
-		log.Printf("NodeMessageHandlerImpl[%d]: Failed to send BlockchainSyncRequest to node at address %d: %v", h.localPort, address, err)
+		Error(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Failed to send BlockchainSyncRequest to node at address %d: %v", colorGreen, h.localPort, colorReset, address, err))
 		return err
 	}
-	log.Printf("NodeMessageHandlerImpl[%d]: Successfully sent BlockchainSyncRequest to node at address %d", h.localPort, address)
+	Info(fmt.Sprintf("NodeMessageHandlerImpl[%s%d%s]: Successfully sent BlockchainSyncRequest to node at address %d", colorGreen, h.localPort, colorReset, address))
 	return nil
 }
 

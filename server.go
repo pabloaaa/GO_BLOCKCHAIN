@@ -21,20 +21,24 @@ func init() {
 }
 
 func main() {
-	log.Println("server: Initializing blockchain")
-	// Inicjalizacja blockchaina
-	blockchain := src.NewBlockchain()
-
-	// Pobierz port z argumentów
+	// Pobierz flagi z argumentów
 	port := flag.String("port", "50001", "port to listen on")
 	httpPort := flag.String("httpPort", "60001", "HTTP port to listen on")
 	bootstrapAddress := flag.String("bootstrapAddress", "50001", "port of the bootstrap node")
+	logLevel := flag.String("logLevel", "info", "log level (info or debug)")
 	flag.Parse()
+
+	// Ustaw poziom logowania
+	src.SetLogLevel(*logLevel)
+
+	src.Info("server: Initializing blockchain")
+	// Inicjalizacja blockchaina
+	blockchain := src.NewBlockchain()
 
 	portInt, _ := strconv.Atoi(*port)
 	bootstrapPortInt, _ := strconv.Atoi(*bootstrapAddress)
 
-	log.Printf("server: Using port %s and HTTP port %s", *port, *httpPort)
+	src.Info(fmt.Sprintf("server: Using port %s and HTTP port %s", *port, *httpPort))
 
 	// Inicjalizacja tcpConnectionManager
 	connectionManager := src.NewTcpConnectionManager(portInt)
@@ -45,7 +49,7 @@ func main() {
 	// Inicjalizacja noda
 	node = src.NewNode(blockchain, portInt, tcpMessageSender, bootstrapPortInt)
 
-	log.Println("server: Starting TCP server")
+	src.Info("server: Starting TCP server")
 	// Start TCP server
 	go node.Start()
 
@@ -53,18 +57,18 @@ func main() {
 	router := gin.Default()
 
 	// Definiowanie endpointów
-
 	router.POST("/sync", syncNodes)
 	router.GET("/status", getStatus)
 	router.POST("/find_new_block", func(c *gin.Context) {
 		go node.TryToFindNewBlock()
 		c.JSON(http.StatusOK, gin.H{"status": "Finding new block started"})
 	})
+	router.POST("/digging", startDigging)
 
 	// Uruchomienie serwera HTTP
-	log.Printf("server: HTTP server started on %s", *httpPort)
+	src.Info(fmt.Sprintf("server: HTTP server started on %s", *httpPort))
 	if err := router.Run(":" + *httpPort); err != nil {
-		log.Fatalf("server: Failed to start HTTP server: %v", err)
+		src.Error(fmt.Sprintf("server: Failed to start HTTP server: %v", err))
 	}
 }
 
@@ -72,7 +76,7 @@ func main() {
 func syncNodes(c *gin.Context) {
 	otherNodeAddress := c.Query("address")
 	if otherNodeAddress == "" {
-		log.Println("server: Address query parameter is missing")
+		src.Error("server: Address query parameter is missing")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "address query parameter is required"})
 		return
 	}
@@ -80,34 +84,34 @@ func syncNodes(c *gin.Context) {
 	// Extract the port from the address
 	parts := strings.Split(otherNodeAddress, ":")
 	if len(parts) != 2 {
-		log.Println("server: Invalid address format")
+		src.Error("server: Invalid address format")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid address format"})
 		return
 	}
 	otherNodePort, err := strconv.Atoi(parts[1])
 	if err != nil {
-		log.Println("server: Invalid port")
+		src.Error("server: Invalid port")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid port"})
 		return
 	}
 
-	log.Printf("server: Starting synchronization with node: %d from node: %d", otherNodePort, node.GetAddress())
+	src.Debug(fmt.Sprintf("server: Starting synchronization with node: %d from node: %d", otherNodePort, node.GetAddress()))
 
 	err = node.SyncNodes(otherNodePort)
 	if err != nil {
-		log.Printf("server: Failed to synchronize nodes: %v", err)
+		src.Error(fmt.Sprintf("server: Failed to synchronize nodes: %v", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to synchronize nodes"})
 		return
 	}
 
-	log.Printf("server: Synchronization with node %d complete", otherNodePort)
+	src.Info(fmt.Sprintf("server: Synchronization with node %d complete", otherNodePort))
 
 	c.JSON(http.StatusOK, gin.H{"message": "synchronization complete"})
 }
 
 // getStatus zwraca obecny stan blockchaina jako HTML
 func getStatus(c *gin.Context) {
-	log.Println("server: Getting blockchain status")
+	src.Debug("server: Getting blockchain status")
 	var blocks []*types.Block
 	node.GetBlockchain().TraverseTree(func(node *types.BlockNode) bool {
 		blocks = append(blocks, node.Block)
@@ -142,8 +146,16 @@ func getStatus(c *gin.Context) {
 	}
 	html += "</ul>"
 
-	html += "</body></html>"
-
-	log.Println("server: Blockchain status retrieved successfully")
+	src.Info("server: Blockchain status retrieved successfully")
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+}
+
+// startDigging uruchamia nieskończoną pętlę do ciągłego poszukiwania nowych bloków
+func startDigging(c *gin.Context) {
+	go func() {
+		for {
+			node.TryToFindNewBlock()
+		}
+	}()
+	c.JSON(http.StatusOK, gin.H{"status": "Continuous block finding started"})
 }

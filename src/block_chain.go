@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
-	"log"
 	"sync"
 	"time"
 
@@ -31,7 +31,8 @@ func (bc *Blockchain) createGenesisBlock() {
 	// Odczytaj plik konfiguracyjny
 	configData, err := ioutil.ReadFile("/Users/pawelnowakowski/go_projects/src/GO_BLOCKCHAIN/config.json")
 	if err != nil {
-		log.Fatalf("Failed to read config file: %v", err)
+		Error(fmt.Sprintf("Failed to read config file: %v", err))
+		return
 	}
 
 	// Zdekoduj dane genesis block
@@ -40,7 +41,8 @@ func (bc *Blockchain) createGenesisBlock() {
 	}
 	err = json.Unmarshal(configData, &config)
 	if err != nil {
-		log.Fatalf("Failed to unmarshal config data: %v", err)
+		Error(fmt.Sprintf("Failed to unmarshal config data: %v", err))
+		return
 	}
 
 	// Utwórz genesis block na podstawie danych z pliku konfiguracyjnego
@@ -65,12 +67,12 @@ func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) erro
 	// Check if a block with the same index already exists
 	existingBlockNode := bc.GetBlockByIndex(block.Index)
 	if existingBlockNode != nil {
-		log.Printf("block_chain: Block with index %d already exists", block.Index)
+		Error(fmt.Sprintf("block_chain: Block with index %d already exists", block.Index))
 		return errors.New("Block with the same index already exists")
 	}
 
 	if err := bc.ValidateBlock(block, parent.Block); err != nil {
-		log.Printf("block_chain: Block validation failed: %v", err)
+		Error(fmt.Sprintf("block_chain: Block validation failed: %v", err))
 		return err
 	}
 
@@ -85,7 +87,7 @@ func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) erro
 	// Call ApproveBlock to check and set checkpoint
 	bc.ApproveBlock(blockNode)
 
-	log.Printf("block_chain: Block with index %d added successfully", block.Index)
+	Debug(fmt.Sprintf("block_chain: Block with index %d added successfully", block.Index))
 	return nil
 }
 
@@ -93,7 +95,7 @@ func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) erro
 func (bc *Blockchain) ApproveBlock(blockNode *types.BlockNode) {
 	if blockNode.Block.Index%10 == 0 {
 		blockNode.Block.Checkpoint = true
-		log.Printf("block_chain: Checkpoint set to true for block index %d", blockNode.Block.Index)
+		Debug(fmt.Sprintf("block_chain: Checkpoint set to true for block index %d", blockNode.Block.Index))
 	} else {
 		blockNode.Block.Checkpoint = false
 	}
