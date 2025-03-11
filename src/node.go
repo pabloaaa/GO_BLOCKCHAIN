@@ -2,26 +2,26 @@ package src
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"sync"
 
 	"github.com/pabloaaa/GO_BLOCKCHAIN/interfaces"
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
-	"github.com/pabloaaa/GO_BLOCKCHAIN/types"
 	"google.golang.org/protobuf/proto"
 )
 
 // Node represents a node in the blockchain network.
 type Node struct {
-	blockchain           interfaces.BlockchainInterface
-	nodes                []int
-	blockHandler         interfaces.BlockMessageHandlerInterface
-	nodeHandler          interfaces.NodeMessageHandlerInterface
-	tcpMessageSender     *TcpMessageSender
-	tcpConnectionManager *TcpConnectionManager
-	address              int
-	mux                  sync.Mutex
+	blockchain                 interfaces.BlockchainInterface
+	nodes                      []int
+	blockHandler               interfaces.BlockMessageHandlerInterface
+	nodeHandler                interfaces.NodeMessageHandlerInterface
+	messageCommunicatorHandler interfaces.MessageCommunicatorHandlerInterface
+	tcpMessageSender           *TcpMessageSender
+	tcpConnectionManager       *TcpConnectionManager
+	address                    int
+	mux                        sync.Mutex
+	messageFactory             *MessageFactory
 }
 
 // NewNode creates a new Node.
@@ -30,11 +30,12 @@ func NewNode(blockchain interfaces.BlockchainInterface, address int, tcpMessageS
 
 	connectionManager := NewTcpConnectionManager(address)
 	node := &Node{
-		blockchain:           blockchain,
-		nodes:                make([]int, 0),
-		tcpMessageSender:     tcpMessageSender,
-		tcpConnectionManager: connectionManager,
-		address:              address,
+		blockchain:                 blockchain,
+		nodes:                      make([]int, 0),
+		tcpMessageSender:           tcpMessageSender,
+		tcpConnectionManager:       connectionManager,
+		address:                    address,
+		messageCommunicatorHandler: NewMessageCommunicatorHandler(blockchain, tcpMessageSender, address),
 	}
 	node.blockHandler = NewBlockMessageHandler(blockchain, node.tcpMessageSender, address)
 	node.nodeHandler = NewNodeMessageHandler(node.tcpMessageSender, &node.nodes, address)
@@ -61,9 +62,9 @@ func (n *Node) GetAddress() int {
 	return n.address
 }
 
-// GetMessageSender returns the TCP message sender.
-func (n *Node) GetMessageSender() *TcpMessageSender {
-	return n.tcpMessageSender
+// GetPortMap returns the port map from TcpConnectionManager.
+func (n *Node) GetPortMap() map[int]net.Conn {
+	return n.tcpConnectionManager.GetPortMap()
 }
 
 // Start starts the node and listens for incoming connections.
@@ -122,25 +123,15 @@ func (n *Node) handleConnection(conn net.Conn) {
 		case *block_chain.MainMessage_NodeMessage:
 			Debug("Node: Handling NodeMessage")
 			n.nodeHandler.HandleNodeMessage(msg.NodeMessage)
+		case *block_chain.MainMessage_CustomMessage:
+			Debug("Node: Handling CustomMessage")
+			n.messageCommunicatorHandler.HandleCommunicatorMessage(msg.CustomMessage)
 		default:
 			Error(fmt.Sprintf("Node: Unknown message type: %T", msg))
 			conn.Close()
 			return
 		}
 	}
-}
-
-// getRandomNodes returns a random subset of nodes.
-func (n *Node) getRandomNodes(count int) []int {
-	if count > len(n.nodes) {
-		count = len(n.nodes)
-	}
-
-	rand.Shuffle(len(n.nodes), func(i, j int) {
-		n.nodes[i], n.nodes[j] = n.nodes[j], n.nodes[i]
-	})
-
-	return n.nodes[:count]
 }
 
 // TryToFindNewBlock attempts to find a new block.
@@ -154,10 +145,7 @@ func (n *Node) TryToFindNewBlock() {
 	Debug(fmt.Sprintf("Node: Latest block index: %d", parentBlock.Index))
 
 	// Generate a new block with the correct index
-	transaction := []types.Transaction{
-		{Sender: []byte("Alice"), Receiver: []byte("Bob"), Amount: 10},
-	}
-	newBlock := n.blockchain.GenerateNewBlock(transaction)
+	newBlock := n.blockchain.GenerateNewBlock()
 	newBlock.Index = parentBlock.Index + 1
 	newBlock.PreviousHash = parentBlock.CalculateHash()
 
@@ -187,8 +175,10 @@ func (n *Node) TryToFindNewBlock() {
 		return
 	} else {
 		Debug(fmt.Sprintf("Node: Block with index %d added successfully", newBlock.Index))
-		// Broadcast the new block to other nodes if it has a checkpoint
+		// Reward the node for finding an approved block
 		if newBlock.Checkpoint {
+			n.blockchain.RewardNode(n.address, 100)
+			Debug(fmt.Sprintf("Node: Reward increased to %d", n.blockchain.GetReward()))
 			Debug("Node: Broadcasting latest block to nodes")
 			n.blockHandler.BroadcastApprovedBlock(newBlock, n.nodes)
 		}
@@ -197,13 +187,13 @@ func (n *Node) TryToFindNewBlock() {
 	n.mux.Unlock() // Unlock the mutex after adding the block
 }
 
+// SendMessage sends a message to another node.
+func (n *Node) SendMessage(receiver int, content string) error {
+	return n.messageCommunicatorHandler.SendMessage(receiver, content)
+}
+
 // SyncNodes synchronizes the node with another node.
 func (n *Node) SyncNodes(address int) error {
 	Debug(fmt.Sprintf("Node: Synchronizing with node at address: %d from node: %d", address, n.address))
 	return n.nodeHandler.SyncNodes(address)
-}
-
-// GetPortMap returns the port map from TcpConnectionManager.
-func (n *Node) GetPortMap() map[int]net.Conn {
-	return n.tcpConnectionManager.GetPortMap()
 }

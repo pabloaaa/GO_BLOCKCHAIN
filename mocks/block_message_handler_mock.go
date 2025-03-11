@@ -1,8 +1,6 @@
 package mocks
 
 import (
-	"net"
-
 	proto "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 	"github.com/pabloaaa/GO_BLOCKCHAIN/types"
 	"github.com/stretchr/testify/mock"
@@ -17,38 +15,39 @@ func NewMockBlockMessageHandler(blockchain *MockBlockchain) *MockBlockMessageHan
 	return &MockBlockMessageHandlerImpl{blockchain: blockchain}
 }
 
-func (m *MockBlockMessageHandlerImpl) HandleBlockMessage(msg *proto.BlockMessage, conn net.Conn) {
-	m.Called(msg, conn)
+func (m *MockBlockMessageHandlerImpl) HandleBlockMessage(msg *proto.BlockMessage) {
+	m.Called(msg)
 }
 
-func (m *MockBlockMessageHandlerImpl) HandleGetLatestBlock(data []byte, address string) {
-	m.Called(data, address)
+func (m *MockBlockMessageHandlerImpl) handleBlockchainSyncRequest(blockChainSyncRequest *proto.BlockchainSyncRequest) {
+	m.Called(blockChainSyncRequest)
 }
 
-func (m *MockBlockMessageHandlerImpl) HandleGetBlockRequest(hash []byte, address string) {
-	m.Called(hash, address)
+func (m *MockBlockMessageHandlerImpl) handleBlockResponse(blockResponse *proto.BlockResponse) {
+	m.Called(blockResponse)
 }
 
-func (m *MockBlockMessageHandlerImpl) HandleBlockResponse(data []byte, address string) {
-	m.Called(data, address)
+func (m *MockBlockMessageHandlerImpl) handleApprovedBlock(approvedBlock *proto.ApprovedBlock) {
+	m.Called(approvedBlock)
 }
 
-func (m *MockBlockMessageHandlerImpl) SendBlock(address string, blockNode *types.BlockNode) {
-	m.Called(address, blockNode)
+func (m *MockBlockMessageHandlerImpl) handleBlockRequest(blockRequest *proto.BlockRequest) {
+	m.Called(blockRequest)
 }
 
-func (m *MockBlockMessageHandlerImpl) SendLatestBlock(address string) {
-	m.Called(address)
+func (m *MockBlockMessageHandlerImpl) BroadcastApprovedBlock(block *types.Block, nodes []int) {
+	m.Called(block, nodes)
 }
 
-func (m *MockBlockMessageHandlerImpl) GetBlock(address string, blockHash []byte) {
-	m.Called(address, blockHash)
+func (m *MockBlockMessageHandlerImpl) GetBlock(hash []byte) *types.BlockNode {
+	args := m.Called(hash)
+	if blockNode, ok := args.Get(0).(*types.BlockNode); ok {
+		return blockNode
+	}
+	return nil
 }
 
-func (m *MockBlockMessageHandlerImpl) GetLatestBlock(address string) {
-	m.Called(address)
-}
-
-func (m *MockBlockMessageHandlerImpl) BroadcastLatestBlock(nodes [][]byte) {
-	m.Called(nodes)
+func (m *MockBlockMessageHandlerImpl) AddBlock(parent *types.BlockNode, block *types.Block) error {
+	args := m.Called(parent, block)
+	return args.Error(0)
 }

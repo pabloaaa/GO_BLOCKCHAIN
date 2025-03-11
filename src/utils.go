@@ -33,6 +33,8 @@ func PrepareProtoMessageToSend(factory *MessageFactory, message proto.Message) (
 		mainMessage, err = factory.CreateNodeMessage(message)
 	case *block_chain.BlockResponse, *block_chain.BlockchainSyncRequest, *block_chain.ApprovedBlock, *block_chain.BlockRequest:
 		mainMessage, err = factory.CreateBlockMessage(message)
+	case *block_chain.Message:
+		mainMessage, err = factory.CreateCustomMessage(message)
 	}
 
 	if err != nil {

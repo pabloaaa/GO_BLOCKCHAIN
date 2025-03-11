@@ -35,8 +35,8 @@ func (m *MockBlockchain) BlockExists(hash []byte) bool {
 	return args.Bool(0)
 }
 
-func (m *MockBlockchain) GenerateNewBlock(transaction []types.Transaction) *types.Block {
-	args := m.Called(transaction)
+func (m *MockBlockchain) GenerateNewBlock() *types.Block {
+	args := m.Called()
 	return args.Get(0).(*types.Block)
 }
 
@@ -65,6 +65,15 @@ func (m *MockBlockchain) ReplaceBlocks(blocks []*types.Block) {
 func (m *MockBlockchain) GetLatestApprovedBlock() *types.Block {
 	args := m.Called()
 	return args.Get(0).(*types.Block)
+}
+
+func (m *MockBlockchain) GetReward() uint64 {
+	args := m.Called()
+	return args.Get(0).(uint64)
+}
+
+func (m *MockBlockchain) RewardNode(address int, amount uint64) {
+	m.Called(address, amount)
 }
 
 // Ensure MockBlockchain implements BlockchainInterface

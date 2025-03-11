@@ -121,8 +121,8 @@ func getStatus(c *gin.Context) {
 	html := "<html><head><title>Blockchain Status</title></head><body><h1>Blockchain Status</h1><ul>"
 	for _, block := range blocks {
 		hash := block.CalculateHash()
-		html += fmt.Sprintf("<li>Index: %d, Timestamp: %d, Previous Hash: %x, Hash: %x, Transactions: %v, Data: %d, Checkpoint: %t</li>",
-			block.Index, block.Timestamp, block.PreviousHash, hash, block.Transactions, block.Data, block.Checkpoint)
+		html += fmt.Sprintf("<li>Index: %d, Timestamp: %d, Previous Hash: %x, Hash: %x, Data: %d, Checkpoint: %t</li>",
+			block.Index, block.Timestamp, block.PreviousHash, hash, block.Data, block.Checkpoint)
 	}
 	html += "</ul>"
 

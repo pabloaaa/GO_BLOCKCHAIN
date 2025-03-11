@@ -10,17 +10,9 @@ import (
 )
 
 func setup() *types.Block {
-	transactions := []types.Transaction{
-		{
-			Sender:   []byte("Alice"),
-			Receiver: []byte("Bob"),
-			Amount:   10.0,
-		},
-	}
 	return &types.Block{
 		Index:        1,
 		Timestamp:    123456789,
-		Transactions: transactions,
 		PreviousHash: []byte("previousHash"),
 		Data:         0,
 		Checkpoint:   false,
@@ -29,7 +21,7 @@ func setup() *types.Block {
 
 func TestCalculateHash(t *testing.T) {
 	block := setup()
-	expectedHash := sha256.Sum256([]byte("1123456789AliceBob10previousHash0"))
+	expectedHash := sha256.Sum256([]byte("1123456789previousHash0"))
 	calculatedHash := block.CalculateHash()
 
 	if !reflect.DeepEqual(calculatedHash, expectedHash[:]) {
@@ -43,15 +35,8 @@ func TestBlockFromProto(t *testing.T) {
 		Timestamp:    123456789,
 		PreviousHash: []byte("previousHash"),
 		Hash:         []byte("hash"),
-		Transactions: []*pb.Transaction{
-			{
-				Sender:   []byte("Alice"),
-				Receiver: []byte("Bob"),
-				Amount:   10.0,
-			},
-		},
-		Data:       0,
-		Checkpoint: true,
+		Data:         0,
+		Checkpoint:   true,
 	}
 	block := types.BlockFromProto(pbBlock)
 
@@ -63,9 +48,6 @@ func TestBlockFromProto(t *testing.T) {
 	}
 	if string(block.PreviousHash) != string(pbBlock.GetPreviousHash()) {
 		t.Errorf("Expected %s, got %s", pbBlock.GetPreviousHash(), block.PreviousHash)
-	}
-	if len(block.Transactions) != len(pbBlock.GetTransactions()) {
-		t.Errorf("Expected %d, got %d", len(pbBlock.GetTransactions()), len(block.Transactions))
 	}
 	if block.Data != pbBlock.GetData() {
 		t.Errorf("Expected %d, got %d", pbBlock.GetData(), block.Data)
@@ -87,9 +69,6 @@ func TestToProto(t *testing.T) {
 	}
 	if string(pbBlock.GetPreviousHash()) != string(block.PreviousHash) {
 		t.Errorf("Expected %s, got %s", block.PreviousHash, pbBlock.GetPreviousHash())
-	}
-	if len(pbBlock.GetTransactions()) != len(block.Transactions) {
-		t.Errorf("Expected %d, got %d", len(block.Transactions), len(pbBlock.GetTransactions()))
 	}
 	if pbBlock.GetData() != block.Data {
 		t.Errorf("Expected %d, got %d", block.Data, pbBlock.GetData())

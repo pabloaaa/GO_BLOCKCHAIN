@@ -15,8 +15,9 @@ import (
 
 // Blockchain represents the blockchain.
 type Blockchain struct {
-	root *types.BlockNode
-	mux  sync.Mutex
+	root   *types.BlockNode
+	reward uint64
+	mux    sync.Mutex
 }
 
 // NewBlockchain creates a new Blockchain.
@@ -240,17 +241,29 @@ func (bc *Blockchain) GetLatestBlockNode() *types.BlockNode {
 	return longestPath[len(longestPath)-1]
 }
 
-// GenerateNewBlock generates a new block with the given transactions.
-func (bc *Blockchain) GenerateNewBlock(transaction []types.Transaction) *types.Block {
+// GenerateNewBlock generates a new block.
+func (bc *Blockchain) GenerateNewBlock() *types.Block {
 	latestBlock := bc.GetLatestBlock()
 	newBlock := &types.Block{
 		Index:        latestBlock.Index + 1,
 		Timestamp:    uint64(time.Now().Unix()),
-		Transactions: transaction,
 		PreviousHash: latestBlock.CalculateHash(),
 		Data:         0,
 	}
 	return newBlock
+}
+
+// GetReward returns the current reward.
+func (bc *Blockchain) GetReward() uint64 {
+	return bc.reward
+}
+
+// RewardNode rewards a node with the specified amount.
+func (bc *Blockchain) RewardNode(address int, amount uint64) {
+	bc.mux.Lock()
+	defer bc.mux.Unlock()
+
+	bc.reward += amount
 }
 
 // Ensure Blockchain implements BlockchainInterface
