@@ -35,14 +35,45 @@ func (m *MockBlockchain) BlockExists(hash []byte) bool {
 	return args.Bool(0)
 }
 
-func (m *MockBlockchain) GenerateNewBlock(transaction []types.Transaction) *types.Block {
-	args := m.Called(transaction)
+func (m *MockBlockchain) GenerateNewBlock() *types.Block {
+	args := m.Called()
 	return args.Get(0).(*types.Block)
 }
 
 func (m *MockBlockchain) GetRoot() *types.BlockNode {
 	args := m.Called()
 	return args.Get(0).(*types.BlockNode)
+}
+
+func (m *MockBlockchain) TraverseTree(callback func(node *types.BlockNode) bool) {
+	args := m.Called(callback)
+	if cb, ok := args.Get(0).(func(node *types.BlockNode) bool); ok {
+		cb(nil) // You can replace `nil` with a mock node if needed
+	}
+}
+
+// GetBlockByIndex returns a block node by its index.
+func (m *MockBlockchain) GetBlockByIndex(index uint64) *types.BlockNode {
+	args := m.Called(index)
+	return args.Get(0).(*types.BlockNode)
+}
+
+func (m *MockBlockchain) ReplaceBlocks(blocks []*types.Block) {
+	m.Called(blocks)
+}
+
+func (m *MockBlockchain) GetLatestApprovedBlock() *types.Block {
+	args := m.Called()
+	return args.Get(0).(*types.Block)
+}
+
+func (m *MockBlockchain) GetReward() uint64 {
+	args := m.Called()
+	return args.Get(0).(uint64)
+}
+
+func (m *MockBlockchain) RewardNode(address int, amount uint64) {
+	m.Called(address, amount)
 }
 
 // Ensure MockBlockchain implements BlockchainInterface

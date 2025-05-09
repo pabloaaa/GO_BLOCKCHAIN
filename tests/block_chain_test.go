@@ -30,14 +30,13 @@ func generateHardcodedValidBlock(parent *types.Block) *types.Block {
 	newBlock := &types.Block{
 		Index:        parent.Index + 1,
 		Timestamp:    uint64(time.Now().Unix()),
-		Transactions: make([]types.Transaction, 0),
 		PreviousHash: parent.CalculateHash(),
 		Data:         0,
 	}
 	// Hardcode the hash to match the validation criteria
 	for {
 		hash := newBlock.CalculateHash()
-		if bytes.HasPrefix(hash, []byte("000")) {
+		if bytes.HasPrefix(hash, []byte("00")) {
 			break
 		}
 		newBlock.Data++
@@ -79,7 +78,6 @@ func TestValidateBlock(t *testing.T) {
 	invalidBlock := &types.Block{
 		Index:        2,
 		Timestamp:    uint64(time.Now().Unix()),
-		Transactions: make([]types.Transaction, 0),
 		PreviousHash: genesisBlock.CalculateHash(),
 		Data:         0,
 	}

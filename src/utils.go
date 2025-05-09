@@ -1,20 +1,45 @@
 package src
 
 import (
-	"fmt"
-
+	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 	"google.golang.org/protobuf/proto"
 )
 
 // EncodeMessage encodes a protobuf message into a byte slice.
-func EncodeMessage(message interface{}) ([]byte, error) {
-	protoMessage, ok := message.(proto.Message)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast message to proto.Message")
-	}
-	data, err := proto.Marshal(protoMessage)
+func EncodeMessage(message proto.Message) ([]byte, error) {
+	data, err := proto.Marshal(message)
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
+}
+
+// DecodeMessage decodes a byte slice into a protobuf message.
+func DecodeMessage(data []byte, message proto.Message) error {
+	err := proto.Unmarshal(data, message)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// PrepareProtoMessageToSend prepares a proto message to be sent.
+func PrepareProtoMessageToSend(factory *MessageFactory, message proto.Message) ([]byte, error) {
+	var mainMessage *block_chain.MainMessage
+	var err error
+
+	switch message.(type) {
+	case *block_chain.WelcomeRequest, *block_chain.WelcomeResponse:
+		mainMessage, err = factory.CreateNodeMessage(message)
+	case *block_chain.BlockResponse, *block_chain.BlockchainSyncRequest, *block_chain.ApprovedBlock, *block_chain.BlockRequest:
+		mainMessage, err = factory.CreateBlockMessage(message)
+	case *block_chain.Message:
+		mainMessage, err = factory.CreateCustomMessage(message)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return EncodeMessage(mainMessage)
 }

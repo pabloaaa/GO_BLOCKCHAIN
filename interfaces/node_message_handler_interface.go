@@ -6,4 +6,6 @@ import (
 
 type NodeMessageHandlerInterface interface {
 	HandleNodeMessage(msg *block_chain.NodeMessage)
+	BroadcastAddress(address []int, sender_address int)
+	SyncNodes(address int) error
 }

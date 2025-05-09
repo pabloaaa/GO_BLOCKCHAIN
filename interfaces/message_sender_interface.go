@@ -1,5 +1,5 @@
 package interfaces
 
 type MessageSender interface {
-	SendMsg(data []byte) error
+	SendMsgToAddress(address int, data []byte) error
 }

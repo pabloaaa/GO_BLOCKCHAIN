@@ -9,47 +9,35 @@ message MainMessage {
   oneof message_type {
     BlockMessage block_message = 1;
     NodeMessage node_message = 2;
+    Message custom_message = 3; // Added this line
   }
 }
 
 // Block-related messages
 message BlockMessage {
   oneof block_message_type {
-    BlockRequest block_request = 1;
-    BlockResponse block_response = 2;
-    BlockchainResponse blockchain_response = 3;
-    BlocksResponse blocks_response = 4;
-    TransactionPoolResponse transaction_pool_response = 5;
-    LatestBlockResponse latest_block_response = 6;
-    BlockUpdateRequest block_update_request = 7;
-    BlockUpdateResponse block_update_response = 8;
-    GetLatestBlockRequest get_latest_block_request = 9;
-    GetBlockRequest get_block_request = 10;
-    Empty empty = 11;
+    BlockResponse block_response = 1;
+    BlockRequest block_request = 2;
+    BlockchainSyncRequest blockchain_sync_request = 3;
+    ApprovedBlock approved_block = 4;
   }
 }
 
 // Node-related messages
 message NodeMessage {
   oneof node_message_type {
-    NodesResponse nodes_response = 1;
-    WelcomeRequest welcome_request = 2;
-    WelcomeResponse welcome_response = 3;
-    PongResponse pong_response = 4;
-    Empty empty = 5;
+    WelcomeRequest welcome_request = 1;
+    WelcomeResponse welcome_response = 2;
   }
 }
 
 //******************************** NODE MESSAGES */
 
-message NodesResponse {
-  repeated bytes nodes = 1;
-}
 message WelcomeRequest {
-  bytes message = 1;
+  bytes sender_address = 1;
 }
 message WelcomeResponse {
-  bytes message = 1;
+  repeated bytes node_adresses = 1;
 }
 message PongResponse {
   bool success = 1;
@@ -57,14 +45,6 @@ message PongResponse {
 /********************************  NODE MESSAGES */
 
 /******************************** BLOCK MESSAGES */
-message BlockRequest {
-  Block block = 1;
-}
-message BlockResponse {
-  bool success = 1;
-  bytes message = 2;
-  Block block = 3;
-}
 message Empty {}
 
 message Block {
@@ -75,6 +55,7 @@ message Block {
   bytes hash = 5;
   uint64 data = 6;
   bool checkpoint = 7; // Added this line
+  uint64 reward = 8; // Added this line
 }
 message Transaction {
   bytes sender = 1;
@@ -82,32 +63,31 @@ message Transaction {
   double amount = 3;
 }
 
-message BlockchainResponse {
-  repeated Block blocks = 1;
-}
-message BlocksResponse {
-  repeated Block blocks = 1;
-}
-message TransactionPoolResponse {
-  repeated Transaction transactions = 1;
+message BlockResponse {
+  Block block = 1;
+  bytes sender_address =2;
 }
 
-message LatestBlockResponse {
-  Block block = 1;
-}
-message BlockUpdateRequest{
-  Block block = 1;
-}
-message BlockUpdateResponse {
-  Block block = 1;
+message BlockRequest {
+  uint64 index = 1;
+  bytes hash = 2;
+  bytes sender_address = 3;
 }
 
-message GetLatestBlockRequest {
-  // No fields, this is an empty message.
+message BlockchainSyncRequest {
+  bytes sender_address = 2;
 }
 
-message GetBlockRequest {
-  bytes hash = 1;
+message ApprovedBlock {
+  Block block = 1;
+  bytes sender_address = 2;
 }
 
 /******************************** BLOCK MESSAGES */
+
+// Added this section
+message Message {
+  bytes sender = 1;
+  bytes receiver = 2;
+  string content = 3;
+}
