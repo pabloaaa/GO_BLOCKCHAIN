@@ -1,8 +1,6 @@
 package src
 
 import (
-	"fmt"
-
 	block_chain "github.com/pabloaaa/GO_BLOCKCHAIN/protos"
 	"google.golang.org/protobuf/proto"
 )
@@ -82,16 +80,4 @@ func (f *MessageFactory) CreateBlockMessage(message proto.Message) (*block_chain
 	return mainMessage, nil
 }
 
-// CreateCustomMessage creates a custom message.
-func (f *MessageFactory) CreateCustomMessage(message proto.Message) (*block_chain.MainMessage, error) {
-	customMessage, ok := message.(*block_chain.Message)
-	if !ok {
-		return nil, fmt.Errorf("invalid message type")
-	}
 
-	return &block_chain.MainMessage{
-		MessageType: &block_chain.MainMessage_CustomMessage{
-			CustomMessage: customMessage,
-		},
-	}, nil
-}

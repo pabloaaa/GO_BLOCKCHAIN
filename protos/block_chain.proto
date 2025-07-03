@@ -9,7 +9,6 @@ message MainMessage {
   oneof message_type {
     BlockMessage block_message = 1;
     NodeMessage node_message = 2;
-    Message custom_message = 3; // Added this line
   }
 }
 
@@ -50,17 +49,15 @@ message Empty {}
 message Block {
   uint64 index = 1;
   uint64 timestamp = 2;
-  repeated Transaction transactions = 3;
+  repeated ChatMessage messages = 3;
   bytes previousHash = 4;
   bytes hash = 5;
   uint64 data = 6;
   bool checkpoint = 7; // Added this line
   uint64 reward = 8; // Added this line
 }
-message Transaction {
-  bytes sender = 1;
-  bytes receiver = 2;
-  double amount = 3;
+message ChatMessage {
+  string content = 1;
 }
 
 message BlockResponse {
@@ -84,10 +81,3 @@ message ApprovedBlock {
 }
 
 /******************************** BLOCK MESSAGES */
-
-// Added this section
-message Message {
-  bytes sender = 1;
-  bytes receiver = 2;
-  string content = 3;
-}

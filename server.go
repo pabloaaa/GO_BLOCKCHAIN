@@ -10,11 +10,13 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pabloaaa/GO_BLOCKCHAIN/frontend"
 	"github.com/pabloaaa/GO_BLOCKCHAIN/src"
 	"github.com/pabloaaa/GO_BLOCKCHAIN/types"
 )
 
 var node *src.Node
+var chatHistory []string // Globalna historia czatu (niezależna od komunikacji Protobuf)
 
 func init() {
 	log.SetOutput(os.Stdout)
@@ -53,23 +55,38 @@ func main() {
 	// Start TCP server
 	go node.Start()
 
+	// Start digging automatically
+	go func() {
+		for {
+			node.TryToFindNewBlock()
+		}
+	}()
+
 	// Inicjalizacja routera Gin
 	router := gin.Default()
 
 	// Definiowanie endpointów
 	router.POST("/sync", syncNodes)
 	router.GET("/status", getStatus)
+	router.GET("/blockchain-data", getBlockchainData) // Dodaj ten endpoint
+	router.Static("/frontend", "./frontend")
 	router.POST("/find_new_block", func(c *gin.Context) {
 		go node.TryToFindNewBlock()
 		c.JSON(http.StatusOK, gin.H{"status": "Finding new block started"})
 	})
 	router.POST("/digging", startDigging)
+	router.GET("/chat-history", getChatHistory)
 
 	// Uruchomienie serwera HTTP
 	src.Info(fmt.Sprintf("server: HTTP server started on %s", *httpPort))
-	if err := router.Run(":" + *httpPort); err != nil {
-		src.Error(fmt.Sprintf("server: Failed to start HTTP server: %v", err))
-	}
+	go func() {
+		if err := router.Run(":" + *httpPort); err != nil {
+			src.Error(fmt.Sprintf("server: Failed to start HTTP server: %v", err))
+		}
+	}()
+
+	// Start the frontend application in the main goroutine
+	frontend.StartFrontend(node)
 }
 
 // syncNodes synchronizuje węzły blockchaina
@@ -121,8 +138,18 @@ func getStatus(c *gin.Context) {
 	html := "<html><head><title>Blockchain Status</title></head><body><h1>Blockchain Status</h1><ul>"
 	for _, block := range blocks {
 		hash := block.CalculateHash()
-		html += fmt.Sprintf("<li>Index: %d, Timestamp: %d, Previous Hash: %x, Hash: %x, Data: %d, Checkpoint: %t</li>",
+		html += fmt.Sprintf("<li>Index: %d, Timestamp: %d, Previous Hash: %x, Hash: %x, Data: %d, Checkpoint: %t",
 			block.Index, block.Timestamp, block.PreviousHash, hash, block.Data, block.Checkpoint)
+		
+		// Add messages if they exist
+		if len(block.Messages) > 0 {
+			html += "<br>Messages: <ul>"
+			for _, msg := range block.Messages {
+				html += fmt.Sprintf("<li>%s</li>", msg)
+			}
+			html += "</ul>"
+		}
+		html += "</li>"
 	}
 	html += "</ul>"
 
@@ -150,7 +177,30 @@ func getStatus(c *gin.Context) {
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 }
 
-// startDigging uruchamia nieskończoną pętlę do ciągłego poszukiwania nowych bloków
+// getBlockchainData zwraca dane blockchaina w formacie DOT
+func getBlockchainData(c *gin.Context) {
+	var blocks []*types.Block
+	node.GetBlockchain().TraverseTree(func(node *types.BlockNode) bool {
+		blocks = append(blocks, node.Block)
+		return false
+	})
+
+	dot := "digraph G {\n"
+	for _, block := range blocks {
+		dot += fmt.Sprintf("\"%x\" [label=\"Index: %d\\nTimestamp: %d\\nData: %d\"];\n", block.CalculateHash(), block.Index, block.Timestamp, block.Data)
+		if block.PreviousHash != nil {
+			dot += fmt.Sprintf("\"%x\" -> \"%x\";\n", block.PreviousHash, block.CalculateHash())
+		}
+	}
+	dot += "}"
+
+	// Log the generated DOT data
+	src.Debug(fmt.Sprintf("Generated DOT data: %s", dot))
+
+	c.String(http.StatusOK, dot)
+}
+
+// uruchamia nieskończoną pętlę do ciągłego poszukiwania nowych bloków
 func startDigging(c *gin.Context) {
 	go func() {
 		for {
@@ -159,3 +209,24 @@ func startDigging(c *gin.Context) {
 	}()
 	c.JSON(http.StatusOK, gin.H{"status": "Continuous block finding started"})
 }
+
+// broadcastMessage dodaje wiadomość do historii czatu
+func broadcastMessage(message string) {
+	chatHistory = append(chatHistory, message)
+	src.Info(fmt.Sprintf("server: Message added to chat history: %s", message))
+}
+
+// getChatHistory zwraca wiadomości z blockchainu
+func getChatHistory(c *gin.Context) {
+	// Pobierz wiadomości z blockchainu
+	var blockchainMessages []string
+	node.GetBlockchain().TraverseTree(func(blockNode *types.BlockNode) bool {
+		for _, msg := range blockNode.Block.Messages {
+			blockchainMessages = append(blockchainMessages, msg)
+		}
+		return false
+	})
+	
+	c.JSON(http.StatusOK, gin.H{"chatHistory": blockchainMessages})
+}
+

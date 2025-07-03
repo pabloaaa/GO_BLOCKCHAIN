@@ -36,7 +36,7 @@ func generateHardcodedValidBlock(parent *types.Block) *types.Block {
 	// Hardcode the hash to match the validation criteria
 	for {
 		hash := newBlock.CalculateHash()
-		if bytes.HasPrefix(hash, []byte("00")) {
+		if bytes.HasPrefix(hash, []byte("000")) {
 			break
 		}
 		newBlock.Data++
@@ -134,3 +134,8 @@ func TestGetLatestBlock(t *testing.T) {
 		t.Errorf("Expected latest block index to be 1, but got %d", latestBlock.Index)
 	}
 }
+
+// TODO: test case that adds hisotry
+// 0 - 1 - 2 - 3 - 4(hash 0x0000)
+// 0 - 1 - 2 - 3 - 4(hash 0x1111) - 5 - 6
+// get best block returns longest chain when query block nr 4

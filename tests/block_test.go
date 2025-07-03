@@ -16,12 +16,13 @@ func setup() *types.Block {
 		PreviousHash: []byte("previousHash"),
 		Data:         0,
 		Checkpoint:   false,
+		Messages:     []string{"test message"},
 	}
 }
 
 func TestCalculateHash(t *testing.T) {
 	block := setup()
-	expectedHash := sha256.Sum256([]byte("1123456789previousHash0"))
+	expectedHash := sha256.Sum256([]byte("1123456789previousHash0test message"))
 	calculatedHash := block.CalculateHash()
 
 	if !reflect.DeepEqual(calculatedHash, expectedHash[:]) {
@@ -37,6 +38,11 @@ func TestBlockFromProto(t *testing.T) {
 		Hash:         []byte("hash"),
 		Data:         0,
 		Checkpoint:   true,
+		Messages: []*pb.ChatMessage{
+			{
+				Content: "test message",
+			},
+		},
 	}
 	block := types.BlockFromProto(pbBlock)
 
@@ -54,6 +60,9 @@ func TestBlockFromProto(t *testing.T) {
 	}
 	if block.Checkpoint != pbBlock.GetCheckpoint() {
 		t.Errorf("Expected %v, got %v", pbBlock.GetCheckpoint(), block.Checkpoint)
+	}
+	if len(block.Messages) != 1 || block.Messages[0] != "test message" {
+		t.Errorf("Expected messages [\"test message\"], got %v", block.Messages)
 	}
 }
 
@@ -75,5 +84,11 @@ func TestToProto(t *testing.T) {
 	}
 	if pbBlock.GetCheckpoint() != block.Checkpoint {
 		t.Errorf("Expected %v, got %v", block.Checkpoint, pbBlock.GetCheckpoint())
+	}
+	if len(pbBlock.GetMessages()) != 1 {
+		t.Errorf("Expected 1 message, got %d", len(pbBlock.GetMessages()))
+	}
+	if pbBlock.GetMessages()[0].GetContent() != "test message" {
+		t.Errorf("Expected message 'test message', got %s", pbBlock.GetMessages()[0].GetContent())
 	}
 }

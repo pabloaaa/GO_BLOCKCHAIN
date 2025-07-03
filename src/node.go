@@ -12,16 +12,17 @@ import (
 
 // Node represents a node in the blockchain network.
 type Node struct {
-	blockchain                 interfaces.BlockchainInterface
-	nodes                      []int
-	blockHandler               interfaces.BlockMessageHandlerInterface
-	nodeHandler                interfaces.NodeMessageHandlerInterface
-	messageCommunicatorHandler interfaces.MessageCommunicatorHandlerInterface
-	tcpMessageSender           *TcpMessageSender
-	tcpConnectionManager       *TcpConnectionManager
-	address                    int
-	mux                        sync.Mutex
-	messageFactory             *MessageFactory
+	blockchain           interfaces.BlockchainInterface
+	nodes                []int
+	blockHandler         interfaces.BlockMessageHandlerInterface
+	nodeHandler          interfaces.NodeMessageHandlerInterface
+	tcpMessageSender     *TcpMessageSender
+	tcpConnectionManager *TcpConnectionManager
+	address              int
+	mux                  sync.Mutex
+	messageFactory       *MessageFactory
+	pendingMessages      []string // Queue for messages to be included in blocks
+	messageMux           sync.Mutex // Mutex for pendingMessages
 }
 
 // NewNode creates a new Node.
@@ -30,12 +31,12 @@ func NewNode(blockchain interfaces.BlockchainInterface, address int, tcpMessageS
 
 	connectionManager := NewTcpConnectionManager(address)
 	node := &Node{
-		blockchain:                 blockchain,
-		nodes:                      make([]int, 0),
-		tcpMessageSender:           tcpMessageSender,
-		tcpConnectionManager:       connectionManager,
-		address:                    address,
-		messageCommunicatorHandler: NewMessageCommunicatorHandler(blockchain, tcpMessageSender, address),
+		blockchain:           blockchain,
+		nodes:                make([]int, 0),
+		tcpMessageSender:     tcpMessageSender,
+		tcpConnectionManager: connectionManager,
+		address:              address,
+		pendingMessages:      make([]string, 0),
 	}
 	node.blockHandler = NewBlockMessageHandler(blockchain, node.tcpMessageSender, address)
 	node.nodeHandler = NewNodeMessageHandler(node.tcpMessageSender, &node.nodes, address)
@@ -95,7 +96,7 @@ func (n *Node) Start() {
 	}
 }
 
-// handleConnection handles an incoming connection.
+// handleConnection handles Protobuf communication between nodes (independent of chat).
 func (n *Node) handleConnection(conn net.Conn) {
 	for {
 		buf := make([]byte, 4096)
@@ -106,10 +107,16 @@ func (n *Node) handleConnection(conn net.Conn) {
 			return
 		}
 
+		// Log the raw data received
+		Debug(fmt.Sprintf("Node: Raw data received (hex): %x", buf[:nRead]))
+		Debug(fmt.Sprintf("Node: Raw data received (string): %s", string(buf[:nRead])))
+
 		var mainMessage block_chain.MainMessage
 		err = proto.Unmarshal(buf[:nRead], &mainMessage)
 		if err != nil {
 			Error(fmt.Sprintf("Node: Failed to unmarshal main message: %v", err))
+			Error(fmt.Sprintf("Node: Data causing error (hex): %x", buf[:nRead]))
+			Error(fmt.Sprintf("Node: Data causing error (string): %s", string(buf[:nRead])))
 			conn.Close()
 			return
 		}
@@ -123,9 +130,6 @@ func (n *Node) handleConnection(conn net.Conn) {
 		case *block_chain.MainMessage_NodeMessage:
 			Debug("Node: Handling NodeMessage")
 			n.nodeHandler.HandleNodeMessage(msg.NodeMessage)
-		case *block_chain.MainMessage_CustomMessage:
-			Debug("Node: Handling CustomMessage")
-			n.messageCommunicatorHandler.HandleCommunicatorMessage(msg.CustomMessage)
 		default:
 			Error(fmt.Sprintf("Node: Unknown message type: %T", msg))
 			conn.Close()
@@ -140,14 +144,21 @@ func (n *Node) TryToFindNewBlock() {
 
 	n.mux.Lock() // Lock the mutex before generating the new block
 
-	// Get the latest approved block or the latest block if no approved block exists
-	parentBlock := n.blockchain.GetLatestBlock()
-	Debug(fmt.Sprintf("Node: Latest block index: %d", parentBlock.Index))
+	// Get the block with the highest index
+	parentBlock := n.blockchain.GetBlockWithHighestIndex()
+	Debug(fmt.Sprintf("Node: Highest block index: %d", parentBlock.Index))
 
 	// Generate a new block with the correct index
 	newBlock := n.blockchain.GenerateNewBlock()
 	newBlock.Index = parentBlock.Index + 1
 	newBlock.PreviousHash = parentBlock.CalculateHash()
+	
+	// Add one pending message to the new block
+	nextMessage := n.GetNextPendingMessage()
+	if nextMessage != "" {
+		newBlock.Messages = []string{nextMessage}
+		Info(fmt.Sprintf("Node: Including message in new block: %s", nextMessage))
+	}
 
 	// Validate the new block
 	nonce := uint64(0)
@@ -187,13 +198,45 @@ func (n *Node) TryToFindNewBlock() {
 	n.mux.Unlock() // Unlock the mutex after adding the block
 }
 
-// SendMessage sends a message to another node.
-func (n *Node) SendMessage(receiver int, content string) error {
-	return n.messageCommunicatorHandler.SendMessage(receiver, content)
-}
-
 // SyncNodes synchronizes the node with another node.
 func (n *Node) SyncNodes(address int) error {
 	Debug(fmt.Sprintf("Node: Synchronizing with node at address: %d from node: %d", address, n.address))
 	return n.nodeHandler.SyncNodes(address)
+}
+
+// AddPendingMessage adds a message to the pending messages queue.
+func (n *Node) AddPendingMessage(message string) {
+	n.messageMux.Lock()
+	defer n.messageMux.Unlock()
+	n.pendingMessages = append(n.pendingMessages, message)
+	Info(fmt.Sprintf("Node: Added message to pending queue: %s", message))
+}
+
+// GetPendingMessages returns and clears the pending messages queue.
+func (n *Node) GetPendingMessages() []string {
+	n.messageMux.Lock()
+	defer n.messageMux.Unlock()
+	messages := make([]string, len(n.pendingMessages))
+	copy(messages, n.pendingMessages)
+	n.pendingMessages = n.pendingMessages[:0] // Clear the queue
+	return messages
+}
+
+// GetNextPendingMessage returns and removes the first pending message.
+func (n *Node) GetNextPendingMessage() string {
+	n.messageMux.Lock()
+	defer n.messageMux.Unlock()
+	if len(n.pendingMessages) == 0 {
+		return ""
+	}
+	message := n.pendingMessages[0]
+	n.pendingMessages = n.pendingMessages[1:] // Remove first message
+	return message
+}
+
+// GetPendingMessageCount returns the number of pending messages without removing them.
+func (n *Node) GetPendingMessageCount() int {
+	n.messageMux.Lock()
+	defer n.messageMux.Unlock()
+	return len(n.pendingMessages)
 }

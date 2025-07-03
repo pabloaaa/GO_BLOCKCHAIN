@@ -15,14 +15,17 @@ import (
 
 // Blockchain represents the blockchain.
 type Blockchain struct {
-	root   *types.BlockNode
-	reward uint64
-	mux    sync.Mutex
+	root         *types.BlockNode
+	reward       uint64
+	mux          sync.Mutex
+	blockHashMap map[string]*types.BlockNode // Map of block hashes (converted to string) to block nodes
 }
 
 // NewBlockchain creates a new Blockchain.
 func NewBlockchain() *Blockchain {
-	blockchain := &Blockchain{}
+	blockchain := &Blockchain{
+		blockHashMap: make(map[string]*types.BlockNode),
+	}
 	blockchain.createGenesisBlock()
 	return blockchain
 }
@@ -53,6 +56,10 @@ func (bc *Blockchain) createGenesisBlock() {
 		Parent: nil,
 		Childs: make([]*types.BlockNode, 0),
 	}
+
+	// Add genesis block to the hash map
+	genesisHash := genesisBlock.CalculateHash()
+	bc.blockHashMap[string(genesisHash)] = bc.root
 }
 
 // GetRoot returns the root block node.
@@ -65,11 +72,19 @@ func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) erro
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
 
+	// Check if a block with the same hash already exists
+	blockHash := string(block.CalculateHash())
+	if _, exists := bc.blockHashMap[blockHash]; exists {
+		Error(fmt.Sprintf("block_chain: Block with hash %x already exists", block.CalculateHash()))
+		return errors.New("Block with the same hash already exists")
+	}
+
 	// Check if a block with the same index already exists
-	existingBlockNode := bc.GetBlockByIndex(block.Index)
-	if existingBlockNode != nil {
-		Error(fmt.Sprintf("block_chain: Block with index %d already exists", block.Index))
-		return errors.New("Block with the same index already exists")
+	for _, node := range bc.blockHashMap {
+		if node.Block.Index == block.Index {
+			Error(fmt.Sprintf("block_chain: Block with index %d already exists", block.Index))
+			return errors.New("Block with the same index already exists")
+		}
 	}
 
 	if err := bc.ValidateBlock(block, parent.Block); err != nil {
@@ -85,6 +100,9 @@ func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) erro
 
 	parent.Childs = append(parent.Childs, blockNode)
 
+	// Add the new block to the hash map
+	bc.blockHashMap[blockHash] = blockNode
+
 	// Call ApproveBlock to check and set checkpoint
 	bc.ApproveBlock(blockNode)
 
@@ -92,14 +110,10 @@ func (bc *Blockchain) AddBlock(parent *types.BlockNode, block *types.Block) erro
 	return nil
 }
 
-// ApproveBlock sets the checkpoint flag for the block if it meets the criteria.
+// ApproveBlock sets the checkpoint flag for the block to true for every block.
 func (bc *Blockchain) ApproveBlock(blockNode *types.BlockNode) {
-	if blockNode.Block.Index%10 == 0 {
-		blockNode.Block.Checkpoint = true
-		Debug(fmt.Sprintf("block_chain: Checkpoint set to true for block index %d", blockNode.Block.Index))
-	} else {
-		blockNode.Block.Checkpoint = false
-	}
+	blockNode.Block.Checkpoint = true
+	Debug(fmt.Sprintf("block_chain: Checkpoint set to true for block index %d", blockNode.Block.Index))
 }
 
 // ValidateBlock validates a block against its parent block.
@@ -111,9 +125,8 @@ func (bc *Blockchain) ValidateBlock(block *types.Block, parentBlock *types.Block
 	if !bytes.Equal(block.PreviousHash, parentBlock.CalculateHash()) {
 		return errors.New("Previous hash is not valid")
 	}
-
-	hashPrefix := block.CalculateHash()[:2]
-	if !bytes.Equal(hashPrefix, []byte("00")) {
+	hashPrefix := block.CalculateHash()[:3]
+	if !bytes.Equal(hashPrefix, []byte("000")) {
 		return errors.New("Block hash is not valid")
 	}
 
@@ -142,76 +155,53 @@ func (bc *Blockchain) ReplaceBlocks(blocks []*types.Block) {
 	bc.root = blockNodes[0] // Assuming the first block is the root
 }
 
-// BlockExists checks if a block exists in the blockchain.
+// BlockExists checks if a block exists in the blockchain using the hash map.
 func (bc *Blockchain) BlockExists(hash []byte) bool {
-	return bc.GetBlock(hash) != nil
+	bc.mux.Lock()
+	defer bc.mux.Unlock()
+	_, exists := bc.blockHashMap[string(hash)]
+	return exists
 }
 
-// TraverseTree traverses the blockchain tree and applies a callback function to each node.
+// TraverseTree traverses the blockchain using the hash map and applies a callback function to each node.
 func (bc *Blockchain) TraverseTree(callback func(node *types.BlockNode) bool) {
-	var queue []*types.BlockNode
+	bc.mux.Lock()
+	defer bc.mux.Unlock()
 
-	queue = append(queue, bc.root)
-	for len(queue) > 0 {
-		node := queue[0]
-		queue = queue[1:]
-
+	for _, node := range bc.blockHashMap {
 		if callback(node) {
 			return
-		}
-
-		for _, child := range node.Childs {
-			queue = append(queue, child)
 		}
 	}
 }
 
-// GetBlock returns a block node by its hash.
+// GetBlock returns a block node by its hash using the hash map.
 func (bc *Blockchain) GetBlock(hash []byte) *types.BlockNode {
-	var foundNode *types.BlockNode
-	bc.TraverseTree(func(node *types.BlockNode) bool {
-		calculatedHash := node.Block.CalculateHash()
-		if bytes.Equal(calculatedHash, hash) {
-			foundNode = node
-			return true
-		}
-		return false
-	})
-	return foundNode
+	bc.mux.Lock()
+	defer bc.mux.Unlock()
+	return bc.blockHashMap[string(hash)]
 }
 
-// GetBlockByIndex returns a block node by its index.
+// GetBlockByIndex returns a block node by its index using the hash map.
 func (bc *Blockchain) GetBlockByIndex(index uint64) *types.BlockNode {
-	var foundNode *types.BlockNode
-	bc.TraverseTree(func(node *types.BlockNode) bool {
+	bc.mux.Lock()
+	defer bc.mux.Unlock()
+
+	for _, node := range bc.blockHashMap {
 		if node.Block.Index == index {
-			foundNode = node
-			return true
+			return node
 		}
-		return false
-	})
-	return foundNode
+	}
+	return nil
 }
 
 // GetLatestBlock returns the latest approved block or the block with the highest index if no approved block exists.
 func (bc *Blockchain) GetLatestBlock() *types.Block {
 	latestBlock := bc.GetLatestApprovedBlock()
 	if latestBlock == nil {
-		latestBlock = bc.getBlockWithHighestIndex()
+		latestBlock = bc.GetBlockWithHighestIndex()
 	}
 	return latestBlock
-}
-
-// getBlockWithHighestIndex returns the block with the highest index.
-func (bc *Blockchain) getBlockWithHighestIndex() *types.Block {
-	var highestBlock *types.Block
-	bc.TraverseTree(func(node *types.BlockNode) bool {
-		if highestBlock == nil || node.Block.Index > highestBlock.Index {
-			highestBlock = node.Block
-		}
-		return false
-	})
-	return highestBlock
 }
 
 // GetLatestApprovedBlock returns the latest approved block in the blockchain.
@@ -259,11 +249,28 @@ func (bc *Blockchain) GetReward() uint64 {
 }
 
 // RewardNode rewards a node with the specified amount.
-func (bc *Blockchain) RewardNode(address int, amount uint64) {
+func (bc *Blockchain) RewardNode(address int, amount int64) error {
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
 
-	bc.reward += amount
+	if amount < 0 && bc.reward < uint64(-amount) {
+		return fmt.Errorf("insufficient reward to deduct")
+	}
+
+	bc.reward += uint64(amount)
+	return nil
+}
+
+// GetBlockWithHighestIndex returns the block with the highest index.
+func (bc *Blockchain) GetBlockWithHighestIndex() *types.Block {
+	var highestBlock *types.Block
+	bc.TraverseTree(func(node *types.BlockNode) bool {
+		if highestBlock == nil || node.Block.Index > highestBlock.Index {
+			highestBlock = node.Block
+		}
+		return false
+	})
+	return highestBlock
 }
 
 // Ensure Blockchain implements BlockchainInterface

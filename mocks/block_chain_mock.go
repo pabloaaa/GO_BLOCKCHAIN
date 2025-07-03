@@ -72,8 +72,15 @@ func (m *MockBlockchain) GetReward() uint64 {
 	return args.Get(0).(uint64)
 }
 
-func (m *MockBlockchain) RewardNode(address int, amount uint64) {
-	m.Called(address, amount)
+// RewardNode is a mock implementation of the RewardNode method.
+func (m *MockBlockchain) RewardNode(address int, amount int64) error {
+	args := m.Called(address, amount)
+	return args.Error(0)
+}
+
+func (m *MockBlockchain) GetBlockWithHighestIndex() *types.Block {
+	args := m.Called()
+	return args.Get(0).(*types.Block)
 }
 
 // Ensure MockBlockchain implements BlockchainInterface
